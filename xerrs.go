@@ -40,12 +40,12 @@ func (location StackLocation) String() string {
 
 // MarshalJSON implements json.Marshaler for XErr
 func (xerr *XErr) MarshalJSON() ([]byte, error) {
-	x := XErrEncoded{}
-
-	x.Data = xerr.Data
-	x.CauseError = xerr.CauseError.Error()
-	x.MaskError = xerr.MaskError.Error()
-	x.Stack = xerr.Stack
+	x := XErrEncoded{
+		Data:       xerr.Data,
+		CauseError: xerr.CauseError.Error(),
+		MaskError:  xerr.MaskError.Error(),
+		Stack:      xerr.Stack,
+	}
 
 	return json.Marshal(x)
 }
@@ -59,12 +59,12 @@ func (xerr *XErr) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	*xerr = XErr{}
-
-	xerr.Data = x.Data
-	xerr.CauseError = errors.New(x.CauseError)
-	xerr.MaskError = errors.New(x.MaskError)
-	xerr.Stack = x.Stack
+	*xerr = XErr{
+		Data:       x.Data,
+		CauseError: errors.New(x.CauseError),
+		MaskError:  errors.New(x.MaskError),
+		Stack:      x.Stack,
+	}
 
 	return nil
 }
@@ -91,9 +91,9 @@ func (xerr *XErr) ToError() error {
 	return errors.New(string(result))
 }
 
-// ExtendError - Returns a new GoLang error which is a marshalled JSON XErr. It is generated based on the error
+// Extend - Returns a new GoLang error which is a marshalled JSON XErr. It is generated based on the error
 // argument passed into the function.
-func ExtendError(err error) error {
+func Extend(err error) error {
 	if err == nil {
 		return nil
 	}
