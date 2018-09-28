@@ -121,10 +121,10 @@ func VeryComplexLongFunction(arg1, arg2) error {
 
 ## Docs
 
-#### func ExtendErrory
+#### func Extend
 
 ```go
-func ExtendError(error) error
+func Extend(error) error
 ```
 
 Extend takes the original error and returns an extended one. Its value is equal to the stringified

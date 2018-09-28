@@ -41,8 +41,8 @@ func transformXErr(err error) error {
 	return xerr.ToError()
 }
 
-// TestExtendError -
-func TestExtendError(t *testing.T) {
+// TestExtend -
+func TestExtend(t *testing.T) {
 
 	type TestCase struct {
 		Description string
@@ -64,13 +64,13 @@ func TestExtendError(t *testing.T) {
 		TestCase{
 			Description: "Non XErr error",
 			Input:       errors.New("ABC"),
-			Output:      errors.New("{\"data\":\"\",\"causeError\":\"ABC\",\"maskError\":\"ABC\",\"stack\":[{\"function\":\"xerrs.TestExtendError.func1\",\"file\":\"xerrs_test.go\",\"line\":73},{\"function\":\"convey.parseAction.func1\",\"file\":\"discovery.go\",\"line\":80},{\"function\":\"convey.(*context).conveyInner\",\"file\":\"context.go\",\"line\":261},{\"function\":\"convey.rootConvey.func1\",\"file\":\"context.go\",\"line\":110}]}"),
+			Output:      errors.New("{\"data\":\"\",\"causeError\":\"ABC\",\"maskError\":\"ABC\",\"stack\":[{\"function\":\"xerrs.TestExtend.func1\",\"file\":\"xerrs_test.go\",\"line\":73},{\"function\":\"convey.parseAction.func1\",\"file\":\"discovery.go\",\"line\":80},{\"function\":\"convey.(*context).conveyInner\",\"file\":\"context.go\",\"line\":261},{\"function\":\"convey.rootConvey.func1\",\"file\":\"context.go\",\"line\":110}]}"),
 		},
 	}
 
 	for _, testCase := range testCases {
 		Convey(testCase.Description, t, func() {
-			output := ExtendError(testCase.Input)
+			output := Extend(testCase.Input)
 
 			output = transformXErr(output)
 
