@@ -445,7 +445,7 @@ func TestGetStack(t *testing.T) {
 				StackLocation{
 					Function: "xerrs.getStack",
 					File:     "xerrs.go",
-					Line:     252,
+					Line:     281,
 				},
 			},
 		},
@@ -503,6 +503,87 @@ func TestGetStack(t *testing.T) {
 			output = transformStack(output)
 
 			So(output, ShouldResemble, testCase.Output)
+		})
+	}
+}
+
+// TestIsEqual -
+func TestIsEqual(t *testing.T) {
+	type TestCase struct {
+		Description string
+		InputErr1   error
+		InputErr2   error
+		Output      bool
+	}
+
+	testCases := []TestCase{
+		TestCase{
+			Description: "nil error",
+			InputErr1:   nil,
+			InputErr2:   nil,
+			Output:      true,
+		},
+		TestCase{
+			Description: "one error is nil",
+			InputErr1:   errors.New("ABC"),
+			InputErr2:   nil,
+			Output:      false,
+		},
+		TestCase{
+			Description: "one error is nil",
+			InputErr1:   nil,
+			InputErr2:   errors.New("ABC"),
+			Output:      false,
+		},
+		TestCase{
+			Description: "Regular errors",
+			InputErr1:   errors.New("ABC"),
+			InputErr2:   errors.New("XYZ"),
+			Output:      false,
+		},
+		TestCase{
+			Description: "one is XErr both equal",
+			InputErr1:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr2:   errors.New("ABC"),
+			Output:      true,
+		},
+		TestCase{
+			Description: "another is XErr both equal",
+			InputErr1:   errors.New("ABC"),
+			InputErr2:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			Output:      true,
+		},
+		TestCase{
+			Description: "both are XErr both equal",
+			InputErr1:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr2:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			Output:      true,
+		},
+		TestCase{
+			Description: "one is XErr both not equal",
+			InputErr1:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr2:   errors.New("XYZ"),
+			Output:      false,
+		},
+		TestCase{
+			Description: "another is XErr both not equal",
+			InputErr1:   errors.New("XYZ"),
+			InputErr2:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			Output:      false,
+		},
+		TestCase{
+			Description: "both are XErr both not equal",
+			InputErr1:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr2:   errors.New("{\"data\":\"1\",\"causeError\":\"XYZ\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			Output:      false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		Convey(testCase.Description, t, func() {
+			output := IsEqual(testCase.InputErr1, testCase.InputErr2)
+
+			So(output, ShouldEqual, testCase.Output)
 		})
 	}
 }

@@ -197,6 +197,16 @@ consist of the original error, its mask, and log-ready stack lines.
 
 Note that the original argument is returned if error is already an extended error.
 
+#### func IsEqual
+
+```go
+func IsEqual(error, error) bool
+```
+
+Returns true if two supplied errors have the same value.
+
+Note If one of those errors is XErr then its Cause value will be used for comparing.
+
 #### func ToXErr
 
 ```go
@@ -215,11 +225,35 @@ comparing extended error to other errors this comparison will most likely fail. 
 serialized string is not really a client friendly error, plus you would expose your code stack to
 the client... which is not good.
 
+Also you cannot use basic comparison == between the original error and xerrs.Cause(err) due to
+marshalling and unmarshalling logic under the hood. Instead xerrs.IsEqual() should be used.
+
+Example:
+
+```go
+func ExampleFunc() {
+    var err error
+    var fault = errors.New("Something very bad")
+
+    err = xerrs.Extend(fault)
+
+    //......
+
+    if xerrs.Cause(err) == fault {
+        // this would never work. Even though fault is used as a cause for xerrs
+        // it will not be the same after it is unmarshalled
+    }
+
+    if xerrs.IsEqual(err, fault) {
+        // this would work just fine
+    }
+```
+
 ## What are the alternatives?
 
 xerrs library was partially inspired by [juju/errors](https://github.com/juju/errors)
 
-[juju/errgo](https://github.com/juju/errgo)
+[pkg/errors](https://github.com/pkg/errors)
 
 Also there are
 [new ideas and drafts for Go error handling](https://go.googlesource.com/proposal/+/master/design/go2draft.md)

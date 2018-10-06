@@ -211,6 +211,35 @@ func Error(err error) string {
 	return ""
 }
 
+// IsEqual - Returns true if two supplied errors have the same value. If one of those errors
+// XErr then its Cause value will be used for comparing
+func IsEqual(err1 error, err2 error) bool {
+	var terr1, terr2 error
+
+	if err1 == nil && err2 == nil {
+		return true
+	}
+	if err1 == nil || err2 == nil {
+		return false
+	}
+
+	xerr1, ok := ToXErr(err1)
+	if ok {
+		terr1 = xerr1.CauseError
+	} else {
+		terr1 = err1
+	}
+
+	xerr2, ok := ToXErr(err2)
+	if ok {
+		terr2 = xerr2.CauseError
+	} else {
+		terr2 = err2
+	}
+
+	return terr1.Error() == terr2.Error()
+}
+
 // Stack - Returns a printable string of the passed error. If the error is serialized XErr then extra data is added.
 // Such data as Cause Error, Mask Error and full Stack if applicable
 func Stack(err error) string {
