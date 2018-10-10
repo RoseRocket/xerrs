@@ -60,33 +60,32 @@ if data, err := MyFunc(); err != nil {
 }
 ```
 
-### Deferred logging + masking
+### Deferred logging + masking example
 
 ```go
-func CreateDock(w http.ResponseWriter, r *http.Request) {
+func DoSomething(w http.ResponseWriter, r *http.Request) {
     var err error
 
     defer func() {
         xerrs.Stack(err)
     }()
 
-    dock := &models.Dock{}
-    err = utils.ReadJSON(r, dock)
+    truck := &Truck{}
+    err = ReadJSONFromReader(r, truck)
     if err != nil {
         err = xerrs.Extend(err)
-        WriteJSONError(w, xerrs.Error(err), http.StatusBadRequest)
+        DoSomethingWithError(w, xerrs.Error(err))
         return
     }
 
-    dock, err = db.DocksCreate(dock)
+    _, err = db.TrucksCreate(truck)
     if err != nil {
         err = xerrs.MaskError(err, errors.New("We are experiencing technical difficulties"))
-
-        WriteJSONError(w, xerrs.Error(err), http.StatusInternalServerError)
+        DoSomethingWithError(w, xerrs.Error(err))
         return
     }
 
-    WriteJSON(w, &utils.JSONResponse{Data: dock})
+    OutputDataToClient(w, &truck)
 }
 ```
 
