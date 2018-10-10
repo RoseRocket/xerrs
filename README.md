@@ -70,22 +70,22 @@ func DoSomething(w http.ResponseWriter, r *http.Request) {
         xerrs.Stack(err)
     }()
 
-    truck := &Truck{}
-    err = ReadJSONFromReader(r, truck)
+    someModel := &Model{}
+    err = ReadJSONFromReader(r, someModel)
     if err != nil {
         err = xerrs.Extend(err)
         DoSomethingWithError(w, xerrs.Error(err))
         return
     }
 
-    _, err = db.TrucksCreate(truck)
+    _, err = DBCreateMyModel(someModel)
     if err != nil {
         err = xerrs.MaskError(err, errors.New("We are experiencing technical difficulties"))
         DoSomethingWithError(w, xerrs.Error(err))
         return
     }
 
-    OutputDataToClient(w, &truck)
+    OutputDataToClient(w, &someModel)
 }
 ```
 
