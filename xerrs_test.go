@@ -58,13 +58,13 @@ func TestExtend(t *testing.T) {
 		},
 		TestCase{
 			Description: "XErr error",
-			Input:       errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
-			Output:      errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
+			Input:       errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
+			Output:      errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
 		},
 		TestCase{
 			Description: "Non XErr error",
 			Input:       errors.New("ABC"),
-			Output:      errors.New("{\"data\":\"\",\"causeError\":\"ABC\",\"maskError\":\"ABC\",\"stack\":[{\"function\":\"xerrs.TestExtend.func1\",\"file\":\"xerrs_test.go\",\"line\":73},{\"function\":\"convey.parseAction.func1\",\"file\":\"discovery.go\",\"line\":80},{\"function\":\"convey.(*context).conveyInner\",\"file\":\"context.go\",\"line\":261},{\"function\":\"convey.rootConvey.func1\",\"file\":\"context.go\",\"line\":110}]}"),
+			Output:      errors.New("{\"data\":{},\"causeError\":\"ABC\",\"maskError\":\"ABC\",\"stack\":[{\"function\":\"xerrs.TestExtend.func1\",\"file\":\"xerrs_test.go\",\"line\":73},{\"function\":\"convey.parseAction.func1\",\"file\":\"discovery.go\",\"line\":80},{\"function\":\"convey.(*context).conveyInner\",\"file\":\"context.go\",\"line\":261},{\"function\":\"convey.rootConvey.func1\",\"file\":\"context.go\",\"line\":110},{\"function\":\"gls.(*ContextManager).SetValues.func1\",\"file\":\"context.go\",\"line\":97}]}"),
 		},
 	}
 
@@ -102,26 +102,32 @@ func TestToError(t *testing.T) {
 		TestCase{
 			Description: "Non Empty XErr",
 			Input: &XErr{
-				Data:       "1",
+				Data: map[string]interface{}{
+					"SOME_DATA": 1,
+				},
 				CauseError: errors.New("ABC"),
 				MaskError:  errors.New("XYZ"),
 				Stack:      []StackLocation{},
 			},
-			Output: errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
+			Output: errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
 		},
 		TestCase{
 			Description: "Empty Mask",
 			Input: &XErr{
-				Data:       "1",
+				Data: map[string]interface{}{
+					"SOME_DATA": 1,
+				},
 				CauseError: errors.New("ABC"),
 				Stack:      []StackLocation{},
 			},
-			Output: errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"ABC\",\"stack\":[]}"),
+			Output: errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"ABC\",\"stack\":[]}"),
 		},
 		TestCase{
 			Description: "Non Empty XErr with stack",
 			Input: &XErr{
-				Data:       "1",
+				Data: map[string]interface{}{
+					"SOME_DATA": 1,
+				},
 				CauseError: errors.New("ABC"),
 				MaskError:  errors.New("XYZ"),
 				Stack: []StackLocation{
@@ -132,7 +138,7 @@ func TestToError(t *testing.T) {
 					},
 				},
 			},
-			Output: errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[{\"function\":\"blah\",\"file\":\"test.go\",\"line\":1000}]}"),
+			Output: errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[{\"function\":\"blah\",\"file\":\"test.go\",\"line\":1000}]}"),
 		},
 	}
 
@@ -166,13 +172,13 @@ func TestCause(t *testing.T) {
 		},
 		TestCase{
 			Description: "XErr",
-			Input:       errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
+			Input:       errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
 			Output:      errors.New("ABC"),
 		},
 		TestCase{
 			Description: "wrong format XErr",
-			Input:       errors.New("{\"data\":\"1\",\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
-			Output:      errors.New("{\"data\":\"1\",\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
+			Input:       errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
+			Output:      errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
 		},
 	}
 
@@ -184,48 +190,60 @@ func TestCause(t *testing.T) {
 	}
 }
 
-// TestData -
-func TestData(t *testing.T) {
+// TestGetData -
+func TestGetData(t *testing.T) {
 
 	type TestCase struct {
 		Description string
-		Input       error
-		OutputData  string
+		InputErr    error
+		InputName   string
+		OutputData  interface{}
 		OutputOK    bool
 	}
 
 	testCases := []TestCase{
 		TestCase{
 			Description: "nil error",
-			Input:       nil,
-			OutputData:  "",
+			InputErr:    nil,
+			InputName:   "SOME_DATA",
+			OutputData:  nil,
 			OutputOK:    false,
 		},
 		TestCase{
 			Description: "Regular error",
-			Input:       errors.New("ABC"),
-			OutputData:  "",
+			InputErr:    errors.New("ABC"),
+			InputName:   "SOME_DATA",
+			OutputData:  nil,
 			OutputOK:    false,
 		},
 		TestCase{
-			Description: "XErr",
-			Input:       errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
-			OutputData:  "1",
+			Description: "XErr existing key",
+			InputErr:    errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
+			InputName:   "SOME_DATA",
+			OutputData:  1,
 			OutputOK:    true,
 		},
 		TestCase{
+			Description: "XErr non existing key",
+			InputErr:    errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
+			InputName:   "OTHER_KEY",
+			OutputData:  nil,
+			OutputOK:    false,
+		},
+		TestCase{
 			Description: "wrong format XErr",
-			Input:       errors.New("{\"data\":\"1\",\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
-			OutputData:  "",
+			InputErr:    errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
+			InputName:   "SOME_DATA",
+			OutputData:  nil,
 			OutputOK:    false,
 		},
 	}
 
 	for _, testCase := range testCases {
 		Convey(testCase.Description, t, func() {
-			output, ok := Data(testCase.Input)
+			output, ok := GetData(testCase.InputErr, testCase.InputName)
 			So(ok, ShouldEqual, testCase.OutputOK)
-			So(output, ShouldResemble, testCase.OutputData)
+			So(output, ShouldEqual, testCase.OutputData)
 		})
 	}
 }
@@ -235,7 +253,8 @@ func TestSetData(t *testing.T) {
 
 	type TestCase struct {
 		Description string
-		InputData   string
+		InputName   string
+		InputValue  interface{}
 		InputError  error
 		Output      error
 	}
@@ -243,33 +262,37 @@ func TestSetData(t *testing.T) {
 	testCases := []TestCase{
 		TestCase{
 			Description: "nil error",
-			InputData:   "SOME_DATA",
+			InputName:   "SOME_DATA",
+			InputValue:  1,
 			InputError:  nil,
 			Output:      nil,
 		},
 		TestCase{
 			Description: "Regular error",
-			InputData:   "SOME_DATA",
+			InputName:   "SOME_DATA",
+			InputValue:  1,
 			InputError:  errors.New("ABC"),
 			Output:      errors.New("ABC"),
 		},
 		TestCase{
 			Description: "XErr",
-			InputData:   "SOME_DATA",
-			InputError:  errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
-			Output:      errors.New("{\"data\":\"SOME_DATA\",\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
+			InputName:   "SOME_DATA",
+			InputValue:  1,
+			InputError:  errors.New("{\"data\":{},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
+			Output:      errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
 		},
 		TestCase{
 			Description: "wrong format XErr",
-			InputData:   "SOME_DATA",
-			InputError:  errors.New("{\"data\":\"1\",\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
-			Output:      errors.New("{\"data\":\"1\",\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
+			InputName:   "SOME_DATA",
+			InputValue:  1,
+			InputError:  errors.New("{\"data\":{},\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
+			Output:      errors.New("{\"data\":{},\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
 		},
 	}
 
 	for _, testCase := range testCases {
 		Convey(testCase.Description, t, func() {
-			output := SetData(testCase.InputError, testCase.InputData)
+			output := SetData(testCase.InputError, testCase.InputName, testCase.InputValue)
 			So(output, ShouldResemble, testCase.Output)
 		})
 	}
@@ -297,13 +320,13 @@ func TestError(t *testing.T) {
 		},
 		TestCase{
 			Description: "XErr",
-			Input:       errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
+			Input:       errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
 			Output:      "XYZ",
 		},
 		TestCase{
 			Description: "wrong format XErr",
-			Input:       errors.New("{\"data\":\"1\",\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
-			Output:      "{\"data\":\"1\",\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}",
+			Input:       errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
+			Output:      "{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}",
 		},
 	}
 
@@ -340,9 +363,9 @@ func TestToXErr(t *testing.T) {
 		},
 		TestCase{
 			Description: "XErr",
-			Input:       errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
+			Input:       errors.New("{\"data\":{},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
 			OutputXErr: &XErr{
-				Data:       "1",
+				Data:       map[string]interface{}{},
 				CauseError: errors.New("ABC"),
 				MaskError:  errors.New("XYZ"),
 				Stack:      []StackLocation{},
@@ -351,7 +374,7 @@ func TestToXErr(t *testing.T) {
 		},
 		TestCase{
 			Description: "wrong format XErr",
-			Input:       errors.New("{\"data\":\"1\",\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
+			Input:       errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\"\"maskErr:\"XYZ\",\"stack\":[]}"),
 			OutputXErr:  nil,
 			OutputOK:    false,
 		},
@@ -393,13 +416,13 @@ func TestMask(t *testing.T) {
 			Description: "Regular error",
 			InputErr:    errors.New("ABC"),
 			InputMask:   errors.New("XYZ"),
-			Output:      errors.New("{\"data\":\"\",\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[{\"function\":\"xerrs.TestMask.func1\",\"file\":\"xerrs_test.go\",\"line\":408},{\"function\":\"convey.parseAction.func1\",\"file\":\"discovery.go\",\"line\":80},{\"function\":\"convey.(*context).conveyInner\",\"file\":\"context.go\",\"line\":261},{\"function\":\"convey.rootConvey.func1\",\"file\":\"context.go\",\"line\":110}]}"),
+			Output:      errors.New("{\"data\":{},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[{\"function\":\"xerrs.TestMask.func1\",\"file\":\"xerrs_test.go\",\"line\":431},{\"function\":\"convey.parseAction.func1\",\"file\":\"discovery.go\",\"line\":80},{\"function\":\"convey.(*context).conveyInner\",\"file\":\"context.go\",\"line\":261},{\"function\":\"convey.rootConvey.func1\",\"file\":\"context.go\",\"line\":110},{\"function\":\"gls.(*ContextManager).SetValues.func1\",\"file\":\"context.go\",\"line\":97}]}"),
 		},
 		TestCase{
 			Description: "XErr",
-			InputErr:    errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr:    errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
 			InputMask:   errors.New("XYZ"),
-			Output:      errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
+			Output:      errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"XYZ\",\"stack\":[]}"),
 		},
 	}
 
@@ -445,7 +468,7 @@ func TestGetStack(t *testing.T) {
 				StackLocation{
 					Function: "xerrs.getStack",
 					File:     "xerrs.go",
-					Line:     281,
+					Line:     289,
 				},
 			},
 		},
@@ -457,7 +480,7 @@ func TestGetStack(t *testing.T) {
 				StackLocation{
 					Function: "xerrs.TestGetStack.func1",
 					File:     "xerrs_test.go",
-					Line:     501,
+					Line:     524,
 				},
 			},
 		},
@@ -469,7 +492,7 @@ func TestGetStack(t *testing.T) {
 				StackLocation{
 					Function: "xerrs.TestGetStack.func1",
 					File:     "xerrs_test.go",
-					Line:     501,
+					Line:     524,
 				},
 				StackLocation{
 					Function: "convey.parseAction.func1",
@@ -543,38 +566,38 @@ func TestIsEqual(t *testing.T) {
 		},
 		TestCase{
 			Description: "one is XErr both equal",
-			InputErr1:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr1:   errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
 			InputErr2:   errors.New("ABC"),
 			Output:      true,
 		},
 		TestCase{
 			Description: "another is XErr both equal",
 			InputErr1:   errors.New("ABC"),
-			InputErr2:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr2:   errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
 			Output:      true,
 		},
 		TestCase{
 			Description: "both are XErr both equal",
-			InputErr1:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
-			InputErr2:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr1:   errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr2:   errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
 			Output:      true,
 		},
 		TestCase{
 			Description: "one is XErr both not equal",
-			InputErr1:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr1:   errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
 			InputErr2:   errors.New("XYZ"),
 			Output:      false,
 		},
 		TestCase{
 			Description: "another is XErr both not equal",
 			InputErr1:   errors.New("XYZ"),
-			InputErr2:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr2:   errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
 			Output:      false,
 		},
 		TestCase{
 			Description: "both are XErr both not equal",
-			InputErr1:   errors.New("{\"data\":\"1\",\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
-			InputErr2:   errors.New("{\"data\":\"1\",\"causeError\":\"XYZ\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr1:   errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"ABC\",\"maskError\":\"BLAH\",\"stack\":[]}"),
+			InputErr2:   errors.New("{\"data\":{\"SOME_DATA\":1},\"causeError\":\"XYZ\",\"maskError\":\"BLAH\",\"stack\":[]}"),
 			Output:      false,
 		},
 	}

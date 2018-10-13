@@ -8,11 +8,16 @@ import (
 	"strings"
 )
 
-const max = 4
+// Maximum number of function lines printed out for Stack() call
+const max = 5
+
+// This value represents the offset in the stack array. We want to keep this
+// number at 2 so that we do not see XErr functions in the stack
+const stackFunctionOffset = 2
 
 // XErr - Extended Error struct
 type XErr struct {
-	Data       string
+	Data       map[string]interface{}
 	CauseError error
 	MaskError  error
 	Stack      []StackLocation
@@ -20,10 +25,10 @@ type XErr struct {
 
 // XErrEncoded - Extended Error struct for JSON encoding. Used for Marshalling and Unmarshalling
 type XErrEncoded struct {
-	Data       string          `json:"data"`
-	CauseError string          `json:"causeError"`
-	MaskError  string          `json:"maskError"`
-	Stack      []StackLocation `json:"stack"`
+	Data       map[string]interface{} `json:"data"`
+	CauseError string                 `json:"causeError"`
+	MaskError  string                 `json:"maskError"`
+	Stack      []StackLocation        `json:"stack"`
 }
 
 // StackLocation - A helper struct function which represents one step in the execution stack
@@ -54,8 +59,7 @@ func (xerr *XErr) MarshalJSON() ([]byte, error) {
 func (xerr *XErr) UnmarshalJSON(data []byte) error {
 	x := XErrEncoded{}
 
-	err := json.Unmarshal(data, &x)
-	if err != nil {
+	if err := json.Unmarshal(data, &x); err != nil {
 		return err
 	}
 
@@ -104,10 +108,10 @@ func Extend(err error) error {
 	}
 
 	xerr = &XErr{
-		Data:       "",
+		Data:       make(map[string]interface{}),
 		CauseError: err,
 		MaskError:  err,
-		Stack:      getStack(2, max),
+		Stack:      getStack(stackFunctionOffset, max),
 	}
 
 	return xerr.ToError()
@@ -121,8 +125,7 @@ func ToXErr(err error) (*XErr, bool) {
 	}
 
 	xerr := &XErr{}
-	e := json.Unmarshal([]byte(err.Error()), xerr)
-	if e != nil {
+	if e := json.Unmarshal([]byte(err.Error()), xerr); e != nil {
 		return nil, false
 	}
 
@@ -147,10 +150,10 @@ func MaskError(err error, mask error) error {
 	xerr, ok = ToXErr(err)
 	if !ok {
 		xerr = &XErr{
-			Data:       "",
+			Data:       make(map[string]interface{}),
 			CauseError: err,
 			MaskError:  mask,
-			Stack:      getStack(2, max),
+			Stack:      getStack(stackFunctionOffset, max),
 		}
 	} else {
 		xerr.MaskError = mask
@@ -169,24 +172,29 @@ func Cause(err error) error {
 	return xerr.CauseError
 }
 
-// Data - Returns Data Error property of the XErr if the passed error is serialized XErr error
-func Data(err error) (string, bool) {
+// GetData - Returns custom Data Error property by name if the passed error is a serialized XErr error
+func GetData(err error, name string) (interface{}, bool) {
 	xerr, ok := ToXErr(err)
 	if !ok {
-		return "", false
+		return nil, false
 	}
 
-	return xerr.Data, true
+	value, ok := xerr.Data[name]
+	if !ok {
+		return nil, false
+	}
+
+	return value, true
 }
 
-// SetData - Sets Data Error property of the XErr if the passed error is serialized XErr error
-func SetData(err error, data string) error {
+// SetData - Sets custom Data Error property if the passed error is a serialized XErr error
+func SetData(err error, name string, value interface{}) error {
 	xerr, ok := ToXErr(err)
 	if !ok {
 		return err
 	}
 
-	xerr.Data = data
+	xerr.Data[name] = value
 
 	return xerr.ToError()
 }

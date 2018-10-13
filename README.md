@@ -25,9 +25,9 @@ project:
 2. **MaskError** - a client-facing error. It might be used whenever you want to mask some errors
    happening on production with a more generic or semantic error
 3. **Stack** - a detailed snapshot of the execution stack at error-time. It might be used to help
-   you to debug your errors
-4. **Data** - a string which contains extra custom data. It could be used error codes, serialized
-   struct states, or any other data you might want to associate with the error.
+   you to debug errors
+4. **Data** - a mao which contains extra custom data. It could be used for any other data you might
+   want to associate with an error.
 
 ## How it works
 
@@ -118,6 +118,42 @@ func VeryComplexLongFunction(arg1, arg2) error {
 }
 ```
 
+### Preserving error stack
+
+```go
+func innerFunc() error {
+    //......
+
+    if err = something; err != nil {
+        return err
+    }
+
+    //......
+
+    if err = somethingElse; err != nil {
+        return xerrs.Extend(err)
+    }
+
+    //......
+}
+
+func outterFunc() {
+    //......
+
+    if err = innerFunc(); err != nil {
+        // At this point if returned err from innerFunc() is XErr then it stays
+        // unchanged with a preserved error stack starting at innerFunc
+        // If err is just a regular error then it will be converted into XErr
+        // where stack will be starting from the outterFunc()
+        err = xerrs.Extend(err)
+
+        // do something here with err
+    }
+
+    //......
+}
+```
+
 ## Docs
 
 #### func Extend
@@ -157,21 +193,21 @@ Note that the first argument is returned back if it is not an extended error.
 #### func SetData
 
 ```go
-func SetData(error, string) error
+func SetData(error, string, interface{}) error
 ```
 
-SetData sets Data property of an extended error. Could be handy if you need to pass along any extra
-data or a serialized object.
+SetData sets custom Data Error property of an extended error. Could be handy if you need to pass any
+extra values with an error.
 
 Note that the first argument is returned back if it is not an extended error.
 
 #### func Data
 
 ```go
-func Data(error) string, bool
+func GetData(error, string) (string, bool)
 ```
 
-Data will return data string property extended error.
+GetData will return custom Data Error property by name of an extended error.
 
 Note that the second return vaue is false if error is not an extended one.
 
