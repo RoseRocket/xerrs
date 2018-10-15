@@ -9,38 +9,17 @@ on the simplicty of your language's error handling, managing errors and debuggin
 and difficult. For instance, GoLang provides a basic error which contains a simple value - but it
 lacks verbose information about the cause of the error or the state of the stack at error-time.
 
-One solution might be to create a new struct which mimics errors but add extra data. However, this
-solution presents problems for refactoring and future error management, especially if your code base
-is large. Moreover, a custom error object might prevent the easy use of third-party Go libraries,
-most of which use native Go errors.
+xerrs uses original GoLang built-in error types but stores extra data.
 
-XErrs uses original GoLang built-in error types and stores all extra data as a string within the
-error itself.
+These are the extra extended features which could be useful for debugging a big project:
 
-These are the extra extended features which could be extremly useful for any debugging or big
-project:
-
-1. **CauseError** - the original error which happened in the system. This is the original built-in
-   GoLang error which you want to preserve
-2. **MaskError** - a client-facing error. It might be used whenever you want to mask some errors
-   happening on production with a more generic or semantic error
-3. **Stack** - a detailed snapshot of the execution stack at error-time. It might be used to help
-   you to debug errors
-4. **Data** - a mao which contains extra custom data. It could be used for any other data you might
-   want to associate with an error.
-
-## How it works
-
-To provide added added context to an error, we store an original error object with extra data as a
-serialized object inside a new GoLang error. Using xerrs functions we can extract any relevant data
-from this new error or convert it back to the original error schema.
-
-## Bonus Points!
-
-Since the error message is a JSON string it makes very easy to share error objects between systems
-written in different programming languages. For instance, extended error values could be shared by a
-system implemented in Python. Alternatively, your Go code could create an error and then pass it to
-any other systems, regardless of their implementation.
+1. **Cause** - the original error which happened in the system. This is the original error which you
+   want to preserve
+2. **Mask** - a mask error. It might be used whenever you want to mask some errors happening on
+   production with a more generic error. Mask is very useful if you want to prevent original error
+   return back to the client. Calling Error() will always return Mask if set.
+3. **Stack** - a detailed snapshot of the execution stack at error-time. Helpful for debugging.
+4. **Data** - a map which could be used to store custom data associated with an error.
 
 ## Quick Usage
 
@@ -52,36 +31,51 @@ import "github.com/roserocket/xerrs"
 //....
 
 if data, err := MyFunc(); err != nil {
-    err = xerrs.Extend(err) // extend error
+    err := xerrs.Extend(err) // extend error
 
     //....
 
-    xerrs.Stack(err) // print detailed error information including its stack
+    if x, ok := err.(*xerr); ok {
+        // In this example we only interested in the last 5 execution calls within the stack
+        fmt.Println(x.Details(5)) // Details prints cause error, mask if specified, and stack (accepting the maximum stack height as parameter)
+    } else {
+        fmt.Println(err) // print basic error message if it is original error
+    }
+
+    //....
 }
 ```
 
 ### Deferred logging + masking example
 
 ```go
+func ErrPrintDetails(err error) {
+    if x, ok := err.(*xerr); ok {
+        fmt.Println(x.Details(5)) // Details prints cause error, mask if specified, and stack (accepting the maximum stack height as parameter)
+    } else {
+        fmt.Println(err) // print basic error message if it is original error
+    }
+}
+
 func DoSomething(w http.ResponseWriter, r *http.Request) {
     var err error
 
     defer func() {
-        xerrs.Stack(err)
+        ErrPrintDetails(err)
     }()
 
     someModel := &Model{}
     err = ReadJSONFromReader(r, someModel)
     if err != nil {
         err = xerrs.Extend(err)
-        DoSomethingWithError(w, xerrs.Error(err))
+        DoSomethingWithError(w, err.Error()) // Calling Error() without setting a mask will return the original error.
         return
     }
 
     _, err = DBCreateMyModel(someModel)
     if err != nil {
         err = xerrs.MaskError(err, errors.New("We are experiencing technical difficulties"))
-        DoSomethingWithError(w, xerrs.Error(err))
+        DoSomethingWithError(w, err.Error()) // Error() will return the masked error in this case.
         return
     }
 
@@ -89,11 +83,47 @@ func DoSomething(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-### Backward compatibility with existing code
+### Custom data in error
+
+```go
+func ErrPrintDetails(err error) {
+    if x, ok := err.(*xerr); ok {
+        fmt.Println(x.Details(5))
+
+        fmt.Println(x.GetData("VALUE")) // print custom error value
+    } else {
+        fmt.Println(err)
+    }
+}
+
+func DoSomething(w http.ResponseWriter, r *http.Request) {
+
+    //......
+
+    var err error
+    err = ReadJSONFromReader(r, someModel)
+    if err != nil {
+        err = xerrs.Extend(err)
+
+        x, _ := err.(*xerr); ok {
+            x.SetData("some_key", "VALUE")
+        }
+    }
+
+    //......
+
+    ErrPrintDetails(err)
+
+    //......
+}
+```
+
+### Compare errors
 
 ```go
 func VeryComplexLongFunction(arg1, arg2) error {
     var err error
+    badErr := errors.New("EPIC FAIL")
     // convert error to an extended one and use it to for debugging purposes
 
     if err {
@@ -102,52 +132,8 @@ func VeryComplexLongFunction(arg1, arg2) error {
 
     //......
 
-    if err {
-        err = xerrs.Extend(err)
-    }
-
-    //......
-    xerrs.Stack(err)
-
-    //......
-
-    // convert back to the regular GoLang error type so that other function
-    // will work without a single change
-    // If err is nil then nil is returned back
-    return xerrs.ToError(err)
-}
-```
-
-### Preserving error stack
-
-```go
-func innerFunc() error {
-    //......
-
-    if err = something; err != nil {
-        return err
-    }
-
-    //......
-
-    if err = somethingElse; err != nil {
-        return xerrs.Extend(err)
-    }
-
-    //......
-}
-
-func outterFunc() {
-    //......
-
-    if err = innerFunc(); err != nil {
-        // At this point if returned err from innerFunc() is XErr then it stays
-        // unchanged with a preserved error stack starting at innerFunc
-        // If err is just a regular error then it will be converted into XErr
-        // where stack will be starting from the outterFunc()
-        err = xerrs.Extend(err)
-
-        // do something here with err
+    if xerrs.IsEqual(err, badErr) {
+        // errors are equal. We need to do something here
     }
 
     //......
@@ -156,81 +142,50 @@ func outterFunc() {
 
 ## Docs
 
+#### func New
+
+```go
+func New(string) error
+```
+
+New creates a new xerr with a supplied message
+
+Note it will also set the stack
+
+#### func Errorf
+
+```go
+func Errorf(string, ...interface{}) error
+```
+
+Errorf creates a new xerr based on a formatted message
+
+Note it will also set the stack
+
 #### func Extend
 
 ```go
 func Extend(error) error
 ```
 
-Extend takes the original error and returns an extended one. Its value is equal to the stringified
-JSON of the Extended Error object containing the original error. Exerr's functions work primarily on
-these extended errors.
+Extend creates a new xerr based on a supplied error
 
-Note that the original argument is returned if error is already an extended error.
+Note if err is nil then nil is returned
 
-#### func MaskError
+Note it will also set the stack
 
-```go
-func MaskError(error, error) error
-```
-
-MaskError works identically as `Extend()` however the second argument is mask error. Mask is used to
-conceal the real error which happened in the system. This could be useful if you need to preserve
-the original error without exposing it to the client.
-
-Note that mask will be changed if the first argument is an extended error.
-
-#### func Cause
+#### func Mask
 
 ```go
-func Cause(error) error
+func Mask(error, error) error
 ```
 
-Cause will return an original error which was extended.
+Mask creates a new xerr based on a supplied error but also sets the mask error as well When Error()
+is called on the error only mask error value is returned back
 
-Note that the first argument is returned back if it is not an extended error.
+Note if err is nil then nil is returned
 
-#### func SetData
-
-```go
-func SetData(error, string, interface{}) error
-```
-
-SetData sets custom Data Error property of an extended error. Could be handy if you need to pass any
-extra values with an error.
-
-Note that the first argument is returned back if it is not an extended error.
-
-#### func Data
-
-```go
-func GetData(error, string) (string, bool)
-```
-
-GetData will return custom Data Error property by name of an extended error.
-
-Note that the second return vaue is false if error is not an extended one.
-
-#### func Error
-
-```go
-func Error(error) string
-```
-
-Error is the same as `err.Error()` call. However if the argument is an extended error then `Error()`
-will be called on the mask error. This function hides access to the original Cause error and could
-be used for sending an error message to the client.
-
-#### func Trace
-
-```go
-func Stack(error) string
-```
-
-Stack returns a detailed string for logging and debugging the error. This detailed string will
-consist of the original error, its mask, and log-ready stack lines.
-
-Note that the original argument is returned if error is already an extended error.
+Note it will also set the stack
 
 #### func IsEqual
 
@@ -238,51 +193,69 @@ Note that the original argument is returned if error is already an extended erro
 func IsEqual(error, error) bool
 ```
 
-Returns true if two supplied errors have the same value.
+IsEqual is a helper function compare if two erros are equal
 
-Note If one of those errors is XErr then its Cause value will be used for comparing.
+Note if one of those errors are xerr then its Cause is used for comparison
 
-#### func ToXErr
-
-```go
-func ToXErr(error) (*XErr, bool)
-```
-
-ToXErr takes an extended error and converts it to the `XErr` object.
-
-Note that the second return value is false if error is not an extended one.
-
-## Possible problems to be aware of
-
-Developers should be aware that extended error is just serialized json string and you might want to
-convert it back to the original error at some point in the lifespan of your app. If you start
-comparing extended error to other errors this comparison will most likely fail. Returning this
-serialized string is not really a client friendly error, plus you would expose your code stack to
-the client... which is not good.
-
-Also you cannot use basic comparison == between the original error and xerrs.Cause(err) due to
-marshalling and unmarshalling logic under the hood. Instead xerrs.IsEqual() should be used.
-
-Example:
+#### xerr func Error
 
 ```go
-func ExampleFunc() {
-    var err error
-    var fault = errors.New("Something very bad")
-
-    err = xerrs.Extend(fault)
-
-    //......
-
-    if xerrs.Cause(err) == fault {
-        // this would never work. Even though fault is used as a cause for xerrs
-        // it will not be the same after it is unmarshalled
-    }
-
-    if xerrs.IsEqual(err, fault) {
-        // this would work just fine
-    }
+func (x *xerr) Error() string
 ```
+
+Error implements error interface Error() function
+
+Note if xerr has a Mask error then Mask.Error() is returned back masking the original error
+
+#### xerr func Cause
+
+```go
+func (x *xerr) Cause() error
+```
+
+Cause returns xerr cause error
+
+#### xerr func Mask
+
+```go
+func (x *xerr) Mask(error)
+```
+
+Mask sets the mask in xerr
+
+#### xerr func SetData
+
+```go
+func (x *xerr) SetData(string, interface{})
+```
+
+SetData sets custom data stored in xerr
+
+#### xerr func GetData
+
+```go
+func (x *xerr) GetData(string) (interface{}, bool)
+```
+
+GetData returns custom data stored in xerr
+
+#### xerr func Stack
+
+```go
+func (x *xerr) Stack() string
+```
+
+Stack returns stack location array
+
+#### xerr func Details
+
+```go
+func (x *xerr) Details(int) string
+```
+
+Details returns a printable string which contains error, mask and stack
+
+Note maxStack can be supplied to change number of printer stack rows
 
 ## What are the alternatives?
 
