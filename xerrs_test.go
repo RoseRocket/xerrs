@@ -2,7 +2,6 @@ package xerrs
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -32,21 +31,20 @@ func transformStack(stack []StackLocation) []StackLocation {
 
 // TestNew -
 func TestNew(t *testing.T) {
-	type TestCase struct {
-		Description string
-		Input       string
-		Output      []StackLocation
-	}
+	Convey("Testing New function", t, func() {
+		output := New("ABC")
 
-	testCases := []TestCase{
-		TestCase{
-			Description: "some error",
-			Input:       "some error",
-			Output: []StackLocation{
+		if x, ok := output.(*xerr); ok {
+			So(x.cause.Error(), ShouldEqual, "ABC")
+			So(x.mask, ShouldEqual, nil)
+
+			stack := transformStack(x.stack)
+
+			So(stack, ShouldResemble, []StackLocation{
 				StackLocation{
 					Function: "xerrs.TestNew.func1",
 					File:     "xerrs_test.go",
-					Line:     132,
+					Line:     35,
 				},
 				StackLocation{
 					Function: "convey.parseAction.func1",
@@ -111,7 +109,7 @@ func TestNew(t *testing.T) {
 				StackLocation{
 					Function: "xerrs.TestNew",
 					File:     "xerrs_test.go",
-					Line:     131,
+					Line:     34,
 				},
 				StackLocation{
 					Function: "testing.tRunner",
@@ -123,50 +121,29 @@ func TestNew(t *testing.T) {
 					File:     "asm_amd64.s",
 					Line:     1333,
 				},
-			},
-		},
-	}
+			})
+		}
 
-	for _, testCase := range testCases {
-		Convey(testCase.Description, t, func() {
-			output := New(testCase.Input)
-
-			if x, ok := output.(*xerr); ok {
-				So(x.Cause().Error(), ShouldEqual, testCase.Input)
-
-				stack := x.Stack()
-				stack = transformStack(stack)
-
-				So(stack, ShouldResemble, testCase.Output)
-			}
-
-			So(output.Error(), ShouldEqual, testCase.Input)
-		})
-	}
+		So(output.Error(), ShouldEqual, "ABC")
+	})
 }
 
 // TestErrorf -
 func TestErrorf(t *testing.T) {
-	type TestCase struct {
-		Description string
-		Input       string
-		InputArgs   []interface{}
-		Output      []StackLocation
-	}
+	Convey("Testing Errorf function", t, func() {
+		output := Errorf("some error %d %v", 1, "HELLO")
 
-	testCases := []TestCase{
-		TestCase{
-			Description: "some error",
-			Input:       "some error %d %v",
-			InputArgs: []interface{}{
-				1,
-				"Hello",
-			},
-			Output: []StackLocation{
+		if x, ok := output.(*xerr); ok {
+			So(x.cause.Error(), ShouldEqual, "some error 1 HELLO")
+			So(x.mask, ShouldEqual, nil)
+
+			stack := transformStack(x.stack)
+
+			So(stack, ShouldResemble, []StackLocation{
 				StackLocation{
 					Function: "xerrs.TestErrorf.func1",
 					File:     "xerrs_test.go",
-					Line:     254,
+					Line:     134,
 				},
 				StackLocation{
 					Function: "convey.parseAction.func1",
@@ -231,7 +208,7 @@ func TestErrorf(t *testing.T) {
 				StackLocation{
 					Function: "xerrs.TestErrorf",
 					File:     "xerrs_test.go",
-					Line:     251,
+					Line:     133,
 				},
 				StackLocation{
 					Function: "testing.tRunner",
@@ -243,47 +220,29 @@ func TestErrorf(t *testing.T) {
 					File:     "asm_amd64.s",
 					Line:     1333,
 				},
-			},
-		},
-	}
+			})
+		}
 
-	for _, testCase := range testCases {
-		Convey(testCase.Description, t, func() {
-			message := fmt.Sprintf(testCase.Input, testCase.InputArgs...)
-
-			output := Errorf(testCase.Input, testCase.InputArgs...)
-
-			if x, ok := output.(*xerr); ok {
-				So(x.Cause().Error(), ShouldEqual, message)
-
-				stack := x.Stack()
-				stack = transformStack(stack)
-
-				So(stack, ShouldResemble, testCase.Output)
-			}
-
-			So(output.Error(), ShouldEqual, message)
-		})
-	}
+		So(output.Error(), ShouldEqual, "some error 1 HELLO")
+	})
 }
 
 // TestExtend -
 func TestExtend(t *testing.T) {
-	type TestCase struct {
-		Description string
-		Input       error
-		Output      []StackLocation
-	}
+	Convey("Testing Extend function", t, func() {
+		output := Extend(errors.New("ABC"))
 
-	testCases := []TestCase{
-		TestCase{
-			Description: "some error",
-			Input:       errors.New("ERROR HERE"),
-			Output: []StackLocation{
+		if x, ok := output.(*xerr); ok {
+			So(x.cause.Error(), ShouldEqual, "ABC")
+			So(x.mask, ShouldEqual, nil)
+
+			stack := transformStack(x.stack)
+
+			So(stack, ShouldResemble, []StackLocation{
 				StackLocation{
 					Function: "xerrs.TestExtend.func1",
 					File:     "xerrs_test.go",
-					Line:     374,
+					Line:     233,
 				},
 				StackLocation{
 					Function: "convey.parseAction.func1",
@@ -348,7 +307,7 @@ func TestExtend(t *testing.T) {
 				StackLocation{
 					Function: "xerrs.TestExtend",
 					File:     "xerrs_test.go",
-					Line:     373,
+					Line:     232,
 				},
 				StackLocation{
 					Function: "testing.tRunner",
@@ -360,313 +319,185 @@ func TestExtend(t *testing.T) {
 					File:     "asm_amd64.s",
 					Line:     1333,
 				},
-			},
-		},
-		TestCase{
-			Description: "nil error",
-			Input:       nil,
-			Output:      []StackLocation{},
-		},
-	}
+			})
+		}
 
-	for _, testCase := range testCases {
-		Convey(testCase.Description, t, func() {
-			output := Extend(testCase.Input)
-
-			if testCase.Input != nil {
-				if x, ok := output.(*xerr); ok {
-					So(x.Cause().Error(), ShouldEqual, testCase.Input.Error())
-
-					stack := x.Stack()
-					stack = transformStack(stack)
-
-					So(stack, ShouldResemble, testCase.Output)
-				}
-
-				So(output.Error(), ShouldEqual, testCase.Input.Error())
-			} else {
-				So(output, ShouldEqual, nil)
-			}
-
-		})
-	}
+		So(output.Error(), ShouldEqual, "ABC")
+	})
 }
 
 // TestMask -
 func TestMask(t *testing.T) {
-	type TestCase struct {
-		Description string
-		InputErr    error
-		MaskErr     error
-		Output      []StackLocation
-	}
+	Convey("nil error", t, func() {
+		err := Mask(nil, errors.New("ABC"))
+		So(err, ShouldEqual, nil)
+	})
 
-	testCases := []TestCase{
-		TestCase{
-			Description: "some error",
-			InputErr:    errors.New("ERROR HERE"),
-			MaskErr:     errors.New("MASK ERROR HERE"),
-			Output: []StackLocation{
-				StackLocation{
-					Function: "xerrs.TestMask.func1",
-					File:     "xerrs_test.go",
-					Line:     589,
-				},
-				StackLocation{
-					Function: "convey.parseAction.func1",
-					File:     "discovery.go",
-					Line:     80,
-				},
-				StackLocation{
-					Function: "convey.(*context).conveyInner",
-					File:     "context.go",
-					Line:     261,
-				},
-				StackLocation{
-					Function: "convey.rootConvey.func1",
-					File:     "context.go",
-					Line:     110,
-				},
-				StackLocation{
-					Function: "gls.(*ContextManager).SetValues.func1",
-					File:     "context.go",
-					Line:     97,
-				},
-				StackLocation{
-					Function: "gls.EnsureGoroutineId.func1",
-					File:     "gid.go",
-					Line:     24,
-				},
-				StackLocation{
-					Function: "gls._m",
-					File:     "stack_tags.go",
-					Line:     74,
-				},
-				StackLocation{
-					Function: "gls.github_com_jtolds_gls_markS",
-					File:     "stack_tags.go",
-					Line:     54,
-				},
-				StackLocation{
-					Function: "gls.addStackTag",
-					File:     "stack_tags.go",
-					Line:     49,
-				},
-				StackLocation{
-					Function: "gls.EnsureGoroutineId",
-					File:     "gid.go",
-					Line:     24,
-				},
-				StackLocation{
-					Function: "gls.(*ContextManager).SetValues",
-					File:     "context.go",
-					Line:     63,
-				},
-				StackLocation{
-					Function: "convey.rootConvey",
-					File:     "context.go",
-					Line:     105,
-				},
-				StackLocation{
-					Function: "convey.Convey",
-					File:     "doc.go",
-					Line:     75,
-				},
-				StackLocation{
-					Function: "xerrs.TestMask",
-					File:     "xerrs_test.go",
-					Line:     588,
-				},
-				StackLocation{
-					Function: "testing.tRunner",
-					File:     "testing.go",
-					Line:     827,
-				},
-				StackLocation{
-					Function: "runtime.goexit",
-					File:     "asm_amd64.s",
-					Line:     1333,
-				},
-			},
-		},
-		TestCase{
-			Description: "nil error",
-			InputErr:    nil,
-			MaskErr:     nil,
-			Output:      []StackLocation{},
-		},
-		TestCase{
-			Description: "nil mask",
-			InputErr:    errors.New("ERROR HERE"),
-			MaskErr:     nil,
-			Output: []StackLocation{
-				StackLocation{
-					Function: "xerrs.TestMask.func1",
-					File:     "xerrs_test.go",
-					Line:     589,
-				},
-				StackLocation{
-					Function: "convey.parseAction.func1",
-					File:     "discovery.go",
-					Line:     80,
-				},
-				StackLocation{
-					Function: "convey.(*context).conveyInner",
-					File:     "context.go",
-					Line:     261,
-				},
-				StackLocation{
-					Function: "convey.rootConvey.func1",
-					File:     "context.go",
-					Line:     110,
-				},
-				StackLocation{
-					Function: "gls.(*ContextManager).SetValues.func1",
-					File:     "context.go",
-					Line:     97,
-				},
-				StackLocation{
-					Function: "gls.EnsureGoroutineId.func1",
-					File:     "gid.go",
-					Line:     24,
-				},
-				StackLocation{
-					Function: "gls._m",
-					File:     "stack_tags.go",
-					Line:     74,
-				},
-				StackLocation{
-					Function: "gls.github_com_jtolds_gls_markS",
-					File:     "stack_tags.go",
-					Line:     54,
-				},
-				StackLocation{
-					Function: "gls.addStackTag",
-					File:     "stack_tags.go",
-					Line:     49,
-				},
-				StackLocation{
-					Function: "gls.EnsureGoroutineId",
-					File:     "gid.go",
-					Line:     24,
-				},
-				StackLocation{
-					Function: "gls.(*ContextManager).SetValues",
-					File:     "context.go",
-					Line:     63,
-				},
-				StackLocation{
-					Function: "convey.rootConvey",
-					File:     "context.go",
-					Line:     105,
-				},
-				StackLocation{
-					Function: "convey.Convey",
-					File:     "doc.go",
-					Line:     75,
-				},
-				StackLocation{
-					Function: "xerrs.TestMask",
-					File:     "xerrs_test.go",
-					Line:     588,
-				},
-				StackLocation{
-					Function: "testing.tRunner",
-					File:     "testing.go",
-					Line:     827,
-				},
-				StackLocation{
-					Function: "runtime.goexit",
-					File:     "asm_amd64.s",
-					Line:     1333,
-				},
-			},
-		},
-	}
+	Convey("basic error with nil mask", t, func() {
+		err := Mask(errors.New("ABC"), nil)
+		_, ok := err.(*xerr)
+		So(err.Error(), ShouldEqual, "ABC")
+		So(ok, ShouldEqual, true)
+	})
 
-	for _, testCase := range testCases {
-		Convey(testCase.Description, t, func() {
-			output := Mask(testCase.InputErr, testCase.MaskErr)
+	Convey("basic error with not nil mask", t, func() {
+		err := Mask(errors.New("ABC"), errors.New("XYZ"))
+		_, ok := err.(*xerr)
+		So(err.Error(), ShouldEqual, "XYZ")
+		So(ok, ShouldEqual, true)
+	})
 
-			if testCase.InputErr != nil {
-				if x, ok := output.(*xerr); ok {
-					So(x.Cause().Error(), ShouldEqual, testCase.InputErr.Error())
+	Convey("xerr without a mask", t, func() {
+		intial := Extend(errors.New("ABC"))
+		err := Mask(intial, errors.New("XYZ"))
+		_, ok := err.(*xerr)
+		So(err.Error(), ShouldEqual, "XYZ")
+		So(ok, ShouldEqual, true)
+	})
 
-					stack := x.Stack()
-					stack = transformStack(stack)
+	Convey("xerr with a mask", t, func() {
+		intial := Mask(errors.New("ABC"), errors.New("001"))
+		err := Mask(intial, errors.New("XYZ"))
+		_, ok := err.(*xerr)
+		So(err.Error(), ShouldEqual, "XYZ")
+		So(ok, ShouldEqual, true)
+	})
 
-					So(stack, ShouldResemble, testCase.Output)
-				}
-
-				if testCase.MaskErr != nil {
-					So(output.Error(), ShouldNotEqual, testCase.InputErr.Error())
-					So(output.Error(), ShouldEqual, testCase.MaskErr.Error())
-				} else {
-					So(output.Error(), ShouldEqual, testCase.InputErr.Error())
-				}
-
-			} else {
-				So(output, ShouldEqual, nil)
-			}
-
-		})
-	}
-}
-
-// TestXMask -
-func TestXMask(t *testing.T) {
-	type TestCase struct {
-		Description string
-		InputStr    string
-		InputMask   error
-		Output      string
-	}
-
-	testCases := []TestCase{
-		TestCase{
-			Description: "basic error",
-			InputStr:    "ERROR",
-			InputMask:   errors.New("MASK ERROR"),
-			Output:      "MASK ERROR",
-		},
-		TestCase{
-			Description: "nil mask",
-			InputStr:    "ERROR",
-			InputMask:   nil,
-			Output:      "ERROR",
-		},
-	}
-
-	for _, testCase := range testCases {
-		Convey(testCase.Description, t, func() {
-			output := New(testCase.InputStr)
-
-			if x, ok := output.(*xerr); ok {
-				x.Mask(testCase.InputMask)
-			}
-
-			So(output.Error(), ShouldEqual, testCase.Output)
-		})
-	}
+	Convey("xerr setting nil mask", t, func() {
+		intial := Mask(errors.New("ABC"), errors.New("001"))
+		err := Mask(intial, nil)
+		_, ok := err.(*xerr)
+		So(err.Error(), ShouldEqual, "ABC")
+		So(ok, ShouldEqual, true)
+	})
 }
 
 // TestGetDataAndSetData -
 func TestGetDataAndSetData(t *testing.T) {
 	Convey("GetData() and SetData()", t, func() {
-		output := New("ERROR")
+		var val interface{}
+		var ok bool
 
-		if x, ok := output.(*xerr); ok {
-			val, ok := x.GetData("SOME_DATA")
-			So(ok, ShouldEqual, false)
+		val, ok = GetData(nil, "SOME_DATA")
+		So(val, ShouldEqual, nil)
+		So(ok, ShouldEqual, false)
 
-			x.SetData("SOME_DATA", 100)
+		val, ok = GetData(errors.New("ABC"), "SOME_DATA")
+		So(val, ShouldEqual, nil)
+		So(ok, ShouldEqual, false)
 
-			val, ok = x.GetData("SOME_DATA")
-			So(ok, ShouldEqual, true)
-			So(val, ShouldEqual, 100)
-		}
+		xerr := New("ERROR")
 
-		So(output.Error(), ShouldEqual, "ERROR")
+		val, ok = GetData(xerr, "SOME_DATA")
+		So(val, ShouldEqual, nil)
+		So(ok, ShouldEqual, false)
+
+		SetData(xerr, "SOME_DATA", 100)
+
+		val, ok = GetData(xerr, "SOME_DATA")
+		So(val, ShouldEqual, 100)
+		So(ok, ShouldEqual, true)
+	})
+}
+
+// TestStack -
+func TestStack(t *testing.T) {
+	Convey("testing stack of nil error", t, func() {
+		So(Stack(nil), ShouldEqual, nil)
+	})
+
+	Convey("testing stack of basic error", t, func() {
+		So(Stack(errors.New("ABC")), ShouldEqual, nil)
+	})
+
+	Convey("testing stack of xerr", t, func() {
+		err := New("ABC")
+		stack := Stack(err)
+
+		stack = transformStack(stack)
+
+		So(stack, ShouldResemble, []StackLocation{
+			StackLocation{
+				Function: "xerrs.TestStack.func3",
+				File:     "xerrs_test.go",
+				Line:     414,
+			},
+			StackLocation{
+				Function: "convey.parseAction.func1",
+				File:     "discovery.go",
+				Line:     80,
+			},
+			StackLocation{
+				Function: "convey.(*context).conveyInner",
+				File:     "context.go",
+				Line:     261,
+			},
+			StackLocation{
+				Function: "convey.rootConvey.func1",
+				File:     "context.go",
+				Line:     110,
+			},
+			StackLocation{
+				Function: "gls.(*ContextManager).SetValues.func1",
+				File:     "context.go",
+				Line:     97,
+			},
+			StackLocation{
+				Function: "gls.EnsureGoroutineId.func1",
+				File:     "gid.go",
+				Line:     24,
+			},
+			StackLocation{
+				Function: "gls._m",
+				File:     "stack_tags.go",
+				Line:     74,
+			},
+			StackLocation{
+				Function: "gls.github_com_jtolds_gls_markS",
+				File:     "stack_tags.go",
+				Line:     54,
+			},
+			StackLocation{
+				Function: "gls.addStackTag",
+				File:     "stack_tags.go",
+				Line:     49,
+			},
+			StackLocation{
+				Function: "gls.EnsureGoroutineId",
+				File:     "gid.go",
+				Line:     24,
+			},
+			StackLocation{
+				Function: "gls.(*ContextManager).SetValues",
+				File:     "context.go",
+				Line:     63,
+			},
+			StackLocation{
+				Function: "convey.rootConvey",
+				File:     "context.go",
+				Line:     105,
+			},
+			StackLocation{
+				Function: "convey.Convey",
+				File:     "doc.go",
+				Line:     75,
+			},
+			StackLocation{
+				Function: "xerrs.TestStack",
+				File:     "xerrs_test.go",
+				Line:     413,
+			},
+			StackLocation{
+				Function: "testing.tRunner",
+				File:     "testing.go",
+				Line:     827,
+			},
+			StackLocation{
+				Function: "runtime.goexit",
+				File:     "asm_amd64.s",
+				Line:     1333,
+			},
+		})
 	})
 }
 
@@ -682,6 +513,13 @@ func TestDetails(t *testing.T) {
 
 	testCases := []TestCase{
 		TestCase{
+			Description:   "nil error",
+			InputError:    nil,
+			InputMask:     errors.New("MASK"),
+			InputMaxStack: 100,
+			Output:        ``,
+		},
+		TestCase{
 			Description:   "basic",
 			InputError:    errors.New("ERROR"),
 			InputMask:     errors.New("MASK"),
@@ -690,7 +528,7 @@ func TestDetails(t *testing.T) {
 [ERROR] ERROR
 [MASK ERROR] MASK
 [STACK]:
-xerrs.TestDetails.func1 [xerrs_test.go:778]
+xerrs.TestDetails.func1 [xerrs_test.go:619]
 convey.parseAction.func1 [discovery.go:80]
 convey.(*context).conveyInner [context.go:261]
 convey.rootConvey.func1 [context.go:110]
@@ -703,7 +541,7 @@ gls.EnsureGoroutineId [gid.go:24]
 gls.(*ContextManager).SetValues [context.go:63]
 convey.rootConvey [context.go:105]
 convey.Convey [doc.go:75]
-xerrs.TestDetails [xerrs_test.go:777]
+xerrs.TestDetails [xerrs_test.go:615]
 testing.tRunner [testing.go:827]
 runtime.goexit [asm_amd64.s:1333]`,
 		},
@@ -715,7 +553,7 @@ runtime.goexit [asm_amd64.s:1333]`,
 			Output: `
 [ERROR] ERROR
 [STACK]:
-xerrs.TestDetails.func1 [xerrs_test.go:778]
+xerrs.TestDetails.func1 [xerrs_test.go:619]
 convey.parseAction.func1 [discovery.go:80]
 convey.(*context).conveyInner [context.go:261]
 convey.rootConvey.func1 [context.go:110]
@@ -728,7 +566,7 @@ gls.EnsureGoroutineId [gid.go:24]
 gls.(*ContextManager).SetValues [context.go:63]
 convey.rootConvey [context.go:105]
 convey.Convey [doc.go:75]
-xerrs.TestDetails [xerrs_test.go:777]
+xerrs.TestDetails [xerrs_test.go:615]
 testing.tRunner [testing.go:827]
 runtime.goexit [asm_amd64.s:1333]`,
 		},
@@ -740,7 +578,7 @@ runtime.goexit [asm_amd64.s:1333]`,
 			Output: `
 [ERROR] ERROR
 [STACK]:
-xerrs.TestDetails.func1 [xerrs_test.go:778]
+xerrs.TestDetails.func1 [xerrs_test.go:621]
 convey.parseAction.func1 [discovery.go:80]
 convey.(*context).conveyInner [context.go:261]
 convey.rootConvey.func1 [context.go:110]
@@ -753,7 +591,7 @@ gls.EnsureGoroutineId [gid.go:24]
 gls.(*ContextManager).SetValues [context.go:63]
 convey.rootConvey [context.go:105]
 convey.Convey [doc.go:75]
-xerrs.TestDetails [xerrs_test.go:777]
+xerrs.TestDetails [xerrs_test.go:615]
 testing.tRunner [testing.go:827]
 runtime.goexit [asm_amd64.s:1333]`,
 		},
@@ -766,7 +604,7 @@ runtime.goexit [asm_amd64.s:1333]`,
 [ERROR] ERROR
 [MASK ERROR] MASK
 [STACK]:
-xerrs.TestDetails.func1 [xerrs_test.go:778]
+xerrs.TestDetails.func1 [xerrs_test.go:619]
 convey.parseAction.func1 [discovery.go:80]
 convey.(*context).conveyInner [context.go:261]
 convey.rootConvey.func1 [context.go:110]`,
@@ -775,18 +613,25 @@ convey.rootConvey.func1 [context.go:110]`,
 
 	for _, testCase := range testCases {
 		Convey(testCase.Description, t, func() {
-			output := Extend(testCase.InputError)
+			var err error
 
-			if x, ok := output.(*xerr); ok {
-				x.Mask(testCase.InputMask)
-
-				stack := x.Stack()
-				stack = transformStack(stack)
-
-				So(x.Details(testCase.InputMaxStack), ShouldEqual, testCase.Output)
+			if testCase.InputMask != nil {
+				err = Mask(testCase.InputError, testCase.InputMask)
+			} else {
+				err = Extend(testCase.InputError)
 			}
+
+			if x, ok := err.(*xerr); ok {
+				x.stack = transformStack(x.stack)
+			}
+
+			So(Details(err, testCase.InputMaxStack), ShouldEqual, testCase.Output)
 		})
 	}
+
+	Convey("Running stack on the basic Go error", t, func() {
+		So(Details(errors.New("ABC"), 5), ShouldEqual, "ABC")
+	})
 }
 
 // TestIsEqual -

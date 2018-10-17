@@ -35,12 +35,9 @@ if data, err := MyFunc(); err != nil {
 
     //....
 
-    if x, ok := err.(*xerr); ok {
-        // In this example we only interested in the last 5 execution calls within the stack
-        fmt.Println(x.Details(5)) // Details prints cause error, mask if specified, and stack (accepting the maximum stack height as parameter)
-    } else {
-        fmt.Println(err) // print basic error message if it is original error
-    }
+    // Details returns cause error, mask if specified, and the stack (accepting the maximum stack height as parameter)
+    // In this example only 5 last stack function calls will be printed out
+    fmt.Println(xerrs.Details(err, 5))
 
     //....
 }
@@ -49,19 +46,15 @@ if data, err := MyFunc(); err != nil {
 ### Deferred logging + masking example
 
 ```go
-func ErrPrintDetails(err error) {
-    if x, ok := err.(*xerr); ok {
-        fmt.Println(x.Details(5)) // Details prints cause error, mask if specified, and stack (accepting the maximum stack height as parameter)
-    } else {
-        fmt.Println(err) // print basic error message if it is original error
-    }
-}
-
 func DoSomething(w http.ResponseWriter, r *http.Request) {
     var err error
 
+    const maxCallstack = 5 // only 5 last stack function calls will be printed out
+
     defer func() {
-        ErrPrintDetails(err)
+        // Details returns cause error, mask if specified, and the stack (accepting the maximum stack height as parameter)
+        // In this example only 5 calls in the stack will be printed out
+        fmt.Println(xerrs.Details(err, maxCallstack))
     }()
 
     someModel := &Model{}
@@ -86,16 +79,6 @@ func DoSomething(w http.ResponseWriter, r *http.Request) {
 ### Custom data in error
 
 ```go
-func ErrPrintDetails(err error) {
-    if x, ok := err.(*xerr); ok {
-        fmt.Println(x.Details(5))
-
-        fmt.Println(x.GetData("VALUE")) // print custom error value
-    } else {
-        fmt.Println(err)
-    }
-}
-
 func DoSomething(w http.ResponseWriter, r *http.Request) {
 
     //......
@@ -105,14 +88,13 @@ func DoSomething(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         err = xerrs.Extend(err)
 
-        x, _ := err.(*xerr); ok {
-            x.SetData("some_key", "VALUE")
-        }
+        xerrs.SetData(err, "some_key", "VALUE") // set custom error value
     }
 
     //......
 
-    ErrPrintDetails(err)
+    fmt.Println(xerrs.Details(err))
+    fmt.Println(xerrs.GetData(err, "some_key")) // print custom error value
 
     //......
 }
@@ -170,7 +152,7 @@ func Extend(error) error
 
 Extend creates a new xerr based on a supplied error
 
-Note if err is nil then nil is returned
+Note if error is nil then nil is returned
 
 Note it will also set the stack
 
@@ -180,10 +162,12 @@ Note it will also set the stack
 func Mask(error, error) error
 ```
 
-Mask creates a new xerr based on a supplied error but also sets the mask error as well When Error()
-is called on the error only mask error value is returned back
+Mask creates a new xerr based on a supplied error but also sets the mask error as well. Only mask
+error value is returned back when Error() is called
 
-Note if err is nil then nil is returned
+Note if error is nil then nil is returned
+
+Note if error is xerr then its mask value is updated
 
 Note it will also set the stack
 
@@ -193,69 +177,61 @@ Note it will also set the stack
 func IsEqual(error, error) bool
 ```
 
-IsEqual is a helper function compare if two erros are equal
+IsEqual is a helper function to compare if two errors are equal
 
-Note if one of those errors are xerr then its Cause is used for comparison
+Note if one of those errors is xerr then it's Cause is used for comparison
 
-#### xerr func Error
+#### func Cause
 
 ```go
-func (x *xerr) Error() string
+func Cause(error) error
 ```
 
-Error implements error interface Error() function
+Cause returns xerr's cause error
 
-Note if xerr has a Mask error then Mask.Error() is returned back masking the original error
+Note if error is not xerr then argument error is returned back
 
-#### xerr func Cause
-
-```go
-func (x *xerr) Cause() error
-```
-
-Cause returns xerr cause error
-
-#### xerr func Mask
+#### func SetData
 
 ```go
-func (x *xerr) Mask(error)
-```
-
-Mask sets the mask in xerr
-
-#### xerr func SetData
-
-```go
-func (x *xerr) SetData(string, interface{})
+func SetData(error, string, interface{})
 ```
 
 SetData sets custom data stored in xerr
 
-#### xerr func GetData
+Note if error is not xerr then function does not do anything
+
+#### func GetData
 
 ```go
-func (x *xerr) GetData(string) (interface{}, bool)
+func GetData(error, string) (interface{}, bool)
 ```
 
 GetData returns custom data stored in xerr
 
-#### xerr func Stack
+Note if error is not xerr then (nil, false) is returned
+
+#### func Stack
 
 ```go
-func (x *xerr) Stack() string
+func Stack(error) []StackLocation
 ```
 
 Stack returns stack location array
 
-#### xerr func Details
+Note if error is not xerr then nil is returned
+
+#### func Details
 
 ```go
-func (x *xerr) Details(int) string
+func Details(error, int) string
 ```
 
 Details returns a printable string which contains error, mask and stack
 
 Note maxStack can be supplied to change number of printer stack rows
+
+Note if error is not xerr then Error() is returned
 
 ## What are the alternatives?
 
