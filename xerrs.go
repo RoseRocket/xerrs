@@ -1,34 +1,21 @@
 package xerrs
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime"
 	"strings"
 )
 
-// Maximum number of function lines printed out for Stack() call
-const max = 5
-
 // This value represents the offset in the stack array. We want to keep this
 // number at 2 so that we do not see XErr functions in the stack
 const stackFunctionOffset = 2
 
-// XErr - Extended Error struct
-type XErr struct {
-	Data       map[string]interface{}
-	CauseError error
-	MaskError  error
-	Stack      []StackLocation
-}
-
-// XErrEncoded - Extended Error struct for JSON encoding. Used for Marshalling and Unmarshalling
-type XErrEncoded struct {
-	Data       map[string]interface{} `json:"data"`
-	CauseError string                 `json:"causeError"`
-	MaskError  string                 `json:"maskError"`
-	Stack      []StackLocation        `json:"stack"`
+type xerr struct {
+	data  map[string]interface{}
+	cause error
+	mask  error
+	stack []StackLocation
 }
 
 // StackLocation - A helper struct function which represents one step in the execution stack
@@ -43,249 +30,161 @@ func (location StackLocation) String() string {
 	return fmt.Sprintf("%s [%s:%d]", location.Function, location.File, location.Line)
 }
 
-// MarshalJSON implements json.Marshaler for XErr
-func (xerr *XErr) MarshalJSON() ([]byte, error) {
-	x := XErrEncoded{
-		Data:       xerr.Data,
-		CauseError: xerr.CauseError.Error(),
-		MaskError:  xerr.MaskError.Error(),
-		Stack:      xerr.Stack,
+// New - creates a new xerr with a supplied message.
+// It will also set the stack.
+func New(message string) error {
+	return &xerr{
+		data:  make(map[string]interface{}),
+		cause: errors.New(message),
+		mask:  nil,
+		stack: getStack(stackFunctionOffset),
 	}
-
-	return json.Marshal(x)
 }
 
-// UnmarshalJSON implements json.Unmarshaler for XErr
-func (xerr *XErr) UnmarshalJSON(data []byte) error {
-	x := XErrEncoded{}
-
-	if err := json.Unmarshal(data, &x); err != nil {
-		return err
+// Errorf - creates a new xerr based on a formatted message.
+// It will also set the stack.
+func Errorf(format string, args ...interface{}) error {
+	return &xerr{
+		data:  make(map[string]interface{}),
+		cause: fmt.Errorf(format, args...),
+		mask:  nil,
+		stack: getStack(stackFunctionOffset),
 	}
-
-	*xerr = XErr{
-		Data:       x.Data,
-		CauseError: errors.New(x.CauseError),
-		MaskError:  errors.New(x.MaskError),
-		Stack:      x.Stack,
-	}
-
-	return nil
 }
 
-// ToError - Converts XErr into a GoLang error where value is equal to marshalled XErr JSON
-func (xerr *XErr) ToError() error {
-	if xerr == nil {
-		return nil
-	}
-
-	if xerr.CauseError == nil {
-		return nil
-	}
-
-	if xerr.MaskError == nil {
-		xerr.MaskError = xerr.CauseError
-	}
-
-	result, e := json.Marshal(xerr)
-	if e != nil {
-		return xerr.MaskError
-	}
-
-	return errors.New(string(result))
-}
-
-// Extend - Returns a new GoLang error which is a marshalled JSON XErr. It is generated based on the error
-// argument passed into the function.
+// Extend - creates a new xerr based on a supplied error.
+// If err is nil then nil is returned
+// It will also set the stack.
 func Extend(err error) error {
 	if err == nil {
 		return nil
 	}
 
-	xerr, ok := ToXErr(err)
-	if ok {
-		return err
+	return &xerr{
+		data:  make(map[string]interface{}),
+		cause: err,
+		mask:  nil,
+		stack: getStack(stackFunctionOffset),
 	}
-
-	xerr = &XErr{
-		Data:       make(map[string]interface{}),
-		CauseError: err,
-		MaskError:  err,
-		Stack:      getStack(stackFunctionOffset, max),
-	}
-
-	return xerr.ToError()
 }
 
-// ToXErr - Will return pointer to XErr based on the argument GoLang error if the argument is a marshalled
-// XErr error. Second return value is a boolean representing if conversion successful
-func ToXErr(err error) (*XErr, bool) {
-	if err == nil {
-		return nil, false
-	}
-
-	xerr := &XErr{}
-	if e := json.Unmarshal([]byte(err.Error()), xerr); e != nil {
-		return nil, false
-	}
-
-	return xerr, true
-}
-
-// MaskError - Returns a new GoLang error which is a marshalled JSON XErr. It is generated based on the error
-// and mask error arguments passed into the function. If initial error is already a serialized XErr then
-// its Mask property will be updated. If Mask is nil then passed in error returned as it is.
-func MaskError(err error, mask error) error {
+// Mask - creates a new xerr based on a supplied error but also sets the mask error as well
+// When Error() is called on the error only mask error value is returned back
+// If err is nil then nil is returned
+// It will also set the stack.
+func Mask(err, mask error) error {
 	if err == nil {
 		return nil
 	}
 
-	if mask == nil {
-		return err
+	return &xerr{
+		data:  make(map[string]interface{}),
+		cause: err,
+		mask:  mask,
+		stack: getStack(stackFunctionOffset),
 	}
-
-	xerr := &XErr{}
-	var ok bool
-
-	xerr, ok = ToXErr(err)
-	if !ok {
-		xerr = &XErr{
-			Data:       make(map[string]interface{}),
-			CauseError: err,
-			MaskError:  mask,
-			Stack:      getStack(stackFunctionOffset, max),
-		}
-	} else {
-		xerr.MaskError = mask
-	}
-
-	return xerr.ToError()
 }
 
-// Cause - Returns Cause Error property of the XErr if the passed error is serialized XErr error
-func Cause(err error) error {
-	xerr, ok := ToXErr(err)
-	if !ok {
-		return err
-	}
-
-	return xerr.CauseError
-}
-
-// GetData - Returns custom Data Error property by name if the passed error is a serialized XErr error
-func GetData(err error, name string) (interface{}, bool) {
-	xerr, ok := ToXErr(err)
-	if !ok {
-		return nil, false
-	}
-
-	value, ok := xerr.Data[name]
-	if !ok {
-		return nil, false
-	}
-
-	return value, true
-}
-
-// SetData - Sets custom Data Error property if the passed error is a serialized XErr error
-func SetData(err error, name string, value interface{}) error {
-	xerr, ok := ToXErr(err)
-	if !ok {
-		return err
-	}
-
-	xerr.Data[name] = value
-
-	return xerr.ToError()
-}
-
-// Error - Is equivalent of calling Error() goroutine of the GoLang error. However if the error
-// is a serialized XErr then Mask.Error() is returned back. This function does not expose Cause
-// to the caller
-func Error(err error) string {
-	if err == nil {
-		return ""
-	}
-
-	xerr, ok := ToXErr(err)
-	if !ok {
-		return err.Error()
-	}
-
-	if xerr.MaskError != nil {
-		return xerr.MaskError.Error()
-	}
-
-	return ""
-}
-
-// IsEqual - Returns true if two supplied errors have the same value. If one of those errors
-// XErr then its Cause value will be used for comparing
-func IsEqual(err1 error, err2 error) bool {
-	var terr1, terr2 error
-
+// IsEqual - helper function to compare if two erros are equal
+// If one of those errors are xerr then its Cause is used for comparison
+func IsEqual(err1, err2 error) bool {
 	if err1 == nil && err2 == nil {
 		return true
 	}
+
 	if err1 == nil || err2 == nil {
 		return false
 	}
 
-	xerr1, ok := ToXErr(err1)
-	if ok {
-		terr1 = xerr1.CauseError
-	} else {
-		terr1 = err1
-	}
+	x1, ok1 := err1.(*xerr)
+	x2, ok2 := err2.(*xerr)
 
-	xerr2, ok := ToXErr(err2)
-	if ok {
-		terr2 = xerr2.CauseError
+	if ok1 && ok2 {
+		return x1.Cause().Error() == x2.Cause().Error()
+	} else if !ok1 && ok2 {
+		return err1.Error() == x2.Cause().Error()
+	} else if ok1 && !ok2 {
+		return x1.Cause().Error() == err2.Error()
 	} else {
-		terr2 = err2
+		return err1.Error() == err2.Error()
 	}
-
-	return terr1.Error() == terr2.Error()
 }
 
-// Stack - Returns a printable string of the passed error. If the error is serialized XErr then extra data is added.
-// Such data as Cause Error, Mask Error and full Stack if applicable
-func Stack(err error) string {
-	if err == nil {
-		return ""
+// Cause - returns xerr cause error
+func (x *xerr) Cause() error {
+	return x.cause
+}
+
+func (x *xerr) Error() string {
+	if x.mask == nil {
+		return x.cause.Error()
 	}
 
-	xerr, ok := ToXErr(err)
+	return x.mask.Error()
+}
+
+// Mask - sets the mask in xerr
+func (x *xerr) Mask(err error) {
+	x.mask = err
+}
+
+// GetData - returns custom data stored in xerr
+func (x *xerr) GetData(name string) (value interface{}, ok bool) {
+	value, ok = x.data[name]
 	if !ok {
-		return err.Error()
+		return
 	}
+
+	return
+}
+
+// SetData - sets custom data stored in xerr
+func (x *xerr) SetData(name string, value interface{}) {
+	x.data[name] = value
+}
+
+// Stack - returns stack location array
+func (x *xerr) Stack() []StackLocation {
+	return x.stack
+}
+
+// Details - returns a printable string which contains error, mask and stack
+// maxStack can be supplied to change number of printer stack rows
+func (x *xerr) Details(maxStack int) string {
+	const newLine = "\n"
 
 	result := []string{""}
 
-	result = append(result, fmt.Sprintf("[ERROR] %s", xerr.CauseError.Error()))
-	if xerr.CauseError != xerr.MaskError {
-		result = append(result, fmt.Sprintf("[MASK ERROR] %s", xerr.MaskError.Error()))
+	result = append(result, fmt.Sprintf("[ERROR] %s", x.cause.Error()))
+	if x.mask != nil && x.cause.Error() != x.mask.Error() {
+		result = append(result, fmt.Sprintf("[MASK ERROR] %s", x.mask.Error()))
 	}
 
-	if len(xerr.Stack) == 0 {
-		return strings.Join(result, "\n")
+	if len(x.stack) == 0 {
+		return strings.Join(result, newLine)
 	}
 
-	result = append(result, "Stack:")
-	for _, stackLocation := range xerr.Stack {
-		result = append(result, stackLocation.String())
+	result = append(result, "[STACK]:")
+
+	top := maxStack
+	if maxStack > len(x.stack) {
+		top = len(x.stack)
 	}
 
-	return strings.Join(result, "\n")
+	for i := 0; i < top; i++ {
+		result = append(result, x.stack[i].String())
+	}
+
+	return strings.Join(result, newLine)
 }
 
 // Returns execution Stack of the goroutine which called it in the form of StackLocation array
 // skip - is a starting level on the execution stack where 0 = getStack() function itself, 1 = caller who called getStack(), and so forth
-// max - maximum number of stack levels returned
-func getStack(skip, max int) []StackLocation {
+func getStack(skip int) []StackLocation {
 	stack := []StackLocation{}
 
-	for i := 0; i < max; i++ {
+	i := 0
+	for {
 		pc, fn, line, ok := runtime.Caller(skip + i)
 		if !ok {
 			return stack
@@ -298,7 +197,7 @@ func getStack(skip, max int) []StackLocation {
 		}
 
 		stack = append(stack, newStackLocation)
-	}
 
-	return stack
+		i++
+	}
 }
