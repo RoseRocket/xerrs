@@ -18,6 +18,14 @@ type xerr struct {
 	stack []StackLocation
 }
 
+func (x *xerr) Error() string {
+	if x.mask == nil {
+		return x.cause.Error()
+	}
+
+	return x.mask.Error()
+}
+
 // StackLocation - A helper struct function which represents one step in the execution stack
 type StackLocation struct {
 	Function string `json:"function"`
@@ -71,10 +79,16 @@ func Extend(err error) error {
 // Mask - creates a new xerr based on a supplied error but also sets the mask error as well
 // When Error() is called on the error only mask error value is returned back
 // If err is nil then nil is returned
+// If err is xerr then its mask value is updated
 // It will also set the stack.
 func Mask(err, mask error) error {
 	if err == nil {
 		return nil
+	}
+
+	if x, ok := err.(*xerr); ok {
+		x.mask = mask
+		return x
 	}
 
 	return &xerr{
@@ -88,72 +102,80 @@ func Mask(err, mask error) error {
 // IsEqual - helper function to compare if two erros are equal
 // If one of those errors are xerr then its Cause is used for comparison
 func IsEqual(err1, err2 error) bool {
-	if err1 == nil && err2 == nil {
+	cause1 := Cause(err1)
+	cause2 := Cause(err2)
+
+	if cause1 == nil && cause2 == nil {
 		return true
 	}
 
-	if err1 == nil || err2 == nil {
+	if cause1 == nil || cause2 == nil {
 		return false
 	}
 
-	x1, ok1 := err1.(*xerr)
-	x2, ok2 := err2.(*xerr)
-
-	if ok1 && ok2 {
-		return x1.Cause().Error() == x2.Cause().Error()
-	} else if !ok1 && ok2 {
-		return err1.Error() == x2.Cause().Error()
-	} else if ok1 && !ok2 {
-		return x1.Cause().Error() == err2.Error()
-	} else {
-		return err1.Error() == err2.Error()
-	}
+	return Cause(err1).Error() == Cause(err2).Error()
 }
 
-// Cause - returns xerr cause error
-func (x *xerr) Cause() error {
-	return x.cause
-}
-
-func (x *xerr) Error() string {
-	if x.mask == nil {
-		return x.cause.Error()
+// Cause - returns xerr's cause error
+// If err is not xerr then err is returned
+func Cause(err error) error {
+	if x, ok := err.(*xerr); ok {
+		return x.cause
 	}
 
-	return x.mask.Error()
-}
-
-// Mask - sets the mask in xerr
-func (x *xerr) Mask(err error) {
-	x.mask = err
+	return err
 }
 
 // GetData - returns custom data stored in xerr
-func (x *xerr) GetData(name string) (value interface{}, ok bool) {
-	value, ok = x.data[name]
+// If err is not xerr then (nil, false) is returned
+func GetData(err error, name string) (value interface{}, ok bool) {
+	var x *xerr
+
+	x, ok = err.(*xerr)
+
 	if !ok {
 		return
 	}
+
+	value, ok = x.data[name]
 
 	return
 }
 
 // SetData - sets custom data stored in xerr
-func (x *xerr) SetData(name string, value interface{}) {
-	x.data[name] = value
+// If err is not xerr then nothing happens
+func SetData(err error, name string, value interface{}) {
+	if x, ok := err.(*xerr); ok {
+		x.data[name] = value
+	}
 }
 
 // Stack - returns stack location array
-func (x *xerr) Stack() []StackLocation {
-	return x.stack
+// If err is not xerr then nil is returned
+func Stack(err error) []StackLocation {
+	if x, ok := err.(*xerr); ok {
+		return x.stack
+	}
+
+	return nil
 }
 
 // Details - returns a printable string which contains error, mask and stack
 // maxStack can be supplied to change number of printer stack rows
-func (x *xerr) Details(maxStack int) string {
+// If err is not xerr then err.Error() is returned
+func Details(err error, maxStack int) string {
+	if err == nil {
+		return ""
+	}
+
 	const newLine = "\n"
 
 	result := []string{""}
+	x, ok := err.(*xerr)
+
+	if !ok {
+		return err.Error()
+	}
 
 	result = append(result, fmt.Sprintf("[ERROR] %s", x.cause.Error()))
 	if x.mask != nil && x.cause.Error() != x.mask.Error() {
