@@ -78,10 +78,10 @@ func DoSomething(w http.ResponseWriter, r *http.Request) {
 
 ```go
 func DoSomething(w http.ResponseWriter, r *http.Request) {
+    var err error
 
     //......
 
-    var err error
     if err = ReadJSONFromReader(r, someModel); err != nil {
         err = xerrs.Extend(err)
 
@@ -104,10 +104,10 @@ func VeryComplexLongFunction(arg1, arg2) error {
     var err error
     badErr := errors.New("EPIC FAIL")
 
+    //......
+
     // convert error to an extended one and use it to for debugging purposes
-    if err {
-        err = xerrs.Extend(err)
-    }
+    err = xerrs.Extend(err)
 
     //......
 
