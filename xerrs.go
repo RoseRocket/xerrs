@@ -42,7 +42,7 @@ func (location StackLocation) String() string {
 // It will also set the stack.
 func New(message string) error {
 	return &xerr{
-		data:  make(map[string]interface{}),
+		data:  nil,
 		cause: errors.New(message),
 		mask:  nil,
 		stack: getStack(stackFunctionOffset),
@@ -53,7 +53,7 @@ func New(message string) error {
 // It will also set the stack.
 func Errorf(format string, args ...interface{}) error {
 	return &xerr{
-		data:  make(map[string]interface{}),
+		data:  nil,
 		cause: fmt.Errorf(format, args...),
 		mask:  nil,
 		stack: getStack(stackFunctionOffset),
@@ -69,7 +69,7 @@ func Extend(err error) error {
 	}
 
 	return &xerr{
-		data:  make(map[string]interface{}),
+		data:  nil,
 		cause: err,
 		mask:  nil,
 		stack: getStack(stackFunctionOffset),
@@ -92,7 +92,7 @@ func Mask(err, mask error) error {
 	}
 
 	return &xerr{
-		data:  make(map[string]interface{}),
+		data:  nil,
 		cause: err,
 		mask:  mask,
 		stack: getStack(stackFunctionOffset),
@@ -137,6 +137,11 @@ func GetData(err error, name string) (value interface{}, ok bool) {
 		return
 	}
 
+	if x.data == nil {
+		ok = false
+		return
+	}
+
 	value, ok = x.data[name]
 
 	return
@@ -146,6 +151,10 @@ func GetData(err error, name string) (value interface{}, ok bool) {
 // If err is not xerr then nothing happens
 func SetData(err error, name string, value interface{}) {
 	if x, ok := err.(*xerr); ok {
+		if x.data == nil {
+			x.data = make(map[string]interface{})
+		}
+
 		x.data[name] = value
 	}
 }

@@ -57,16 +57,14 @@ func DoSomething(w http.ResponseWriter, r *http.Request) {
         fmt.Println(xerrs.Details(err, maxCallstack))
     }()
 
-    someModel := &Model{}
-    err = ReadJSONFromReader(r, someModel)
-    if err != nil {
+    var someModel Model
+    if err = ReadJSONFromReader(r, &someModel); err != nil {
         err = xerrs.Extend(err)
         DoSomethingWithError(w, err.Error()) // Calling Error() without setting a mask will return the original error.
         return
     }
 
-    _, err = DBCreateMyModel(someModel)
-    if err != nil {
+    if _, err = DBCreateMyModel(&someModel); err != nil {
         err = xerrs.MaskError(err, errors.New("We are experiencing technical difficulties"))
         DoSomethingWithError(w, err.Error()) // Error() will return the masked error in this case.
         return
@@ -84,8 +82,7 @@ func DoSomething(w http.ResponseWriter, r *http.Request) {
     //......
 
     var err error
-    err = ReadJSONFromReader(r, someModel)
-    if err != nil {
+    if err = ReadJSONFromReader(r, someModel); err != nil {
         err = xerrs.Extend(err)
 
         xerrs.SetData(err, "some_key", "VALUE") // set custom error value
@@ -106,8 +103,8 @@ func DoSomething(w http.ResponseWriter, r *http.Request) {
 func VeryComplexLongFunction(arg1, arg2) error {
     var err error
     badErr := errors.New("EPIC FAIL")
-    // convert error to an extended one and use it to for debugging purposes
 
+    // convert error to an extended one and use it to for debugging purposes
     if err {
         err = xerrs.Extend(err)
     }
