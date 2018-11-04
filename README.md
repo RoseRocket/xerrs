@@ -65,7 +65,7 @@ func DoSomething(w http.ResponseWriter, r *http.Request) {
     }
 
     if _, err = DBCreateMyModel(&someModel); err != nil {
-        err = xerrs.MaskError(err, errors.New("We are experiencing technical difficulties"))
+        err = xerrs.Mask(err, errors.New("We are experiencing technical difficulties"))
         DoSomethingWithError(w, err.Error()) // Error() will return the masked error in this case.
         return
     }
