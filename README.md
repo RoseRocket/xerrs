@@ -1,4 +1,4 @@
-# xerrs
+# xerrs [![Build Status](https://travis-ci.org/RoseRocket/xerrs.svg?branch=master)](https://travis-ci.org/RoseRocket/xerrs)
 
 Extended Errors for Go
 
