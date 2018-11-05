@@ -1,5 +1,7 @@
 # xerrs
 
+[![Build Status](https://travis-ci.org/anvk/xerrs.svg?branch=master)](https://travis-ci.org/anvk/xerrs)
+
 Extended Errors for Go
 
 ## What? Why?
