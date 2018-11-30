@@ -712,3 +712,76 @@ func TestGetDataAndSetData(t *testing.T) {
 		So(ok, ShouldEqual, true)
 	})
 }
+
+func TestWrap(t *testing.T) {
+	for _, test := range []struct {
+		in      error
+		msg     string
+		wantMsg string
+		isNil   bool
+	}{
+		{
+			in:      nil,
+			msg:     "nothing",
+			wantMsg: "",
+			isNil:   true,
+		},
+		{
+			in:      New("i/o error"),
+			msg:     "read",
+			wantMsg: "read: i/o error",
+			isNil:   false,
+		},
+	} {
+		err := Wrap(test.in, test.msg)
+		if err == nil && !test.isNil {
+			t.Error("expected non-nil error")
+		} else if err != nil && test.isNil {
+			t.Errorf("expected nil error, got=%v", err)
+		}
+
+		if err != nil {
+			if got := err.Error(); test.wantMsg != got {
+				t.Errorf("wrong error message: want=%v got=%v", test.wantMsg, got)
+			}
+		}
+	}
+}
+
+func TestWrapf(t *testing.T) {
+	for _, test := range []struct {
+		in      error
+		format  string
+		args    []interface{}
+		wantMsg string
+		isNil   bool
+	}{
+		{
+			in:      nil,
+			format:  "nothing",
+			args:    nil,
+			wantMsg: "",
+			isNil:   true,
+		},
+		{
+			in:      New("i/o error"),
+			format:  "read %q",
+			args:    []interface{}{"config.yaml"},
+			wantMsg: "read \"config.yaml\": i/o error",
+			isNil:   false,
+		},
+	} {
+		err := Wrapf(test.in, test.format, test.args...)
+		if err == nil && !test.isNil {
+			t.Error("expected non-nil error")
+		} else if err != nil && test.isNil {
+			t.Errorf("expected nil error, got=%v", err)
+		}
+
+		if err != nil {
+			if got := err.Error(); test.wantMsg != got {
+				t.Errorf("wrong error message: want=%v got=%v", test.wantMsg, got)
+			}
+		}
+	}
+}

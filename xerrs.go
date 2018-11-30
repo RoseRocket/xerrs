@@ -16,14 +16,19 @@ type xerr struct {
 	cause error
 	mask  error
 	stack []StackLocation
+	msg   string
 }
 
 func (x *xerr) Error() string {
-	if x.mask == nil {
-		return x.cause.Error()
+	if x.mask != nil {
+		return x.mask.Error()
 	}
 
-	return x.mask.Error()
+	if x.msg != "" {
+		return x.msg + ": " + x.cause.Error()
+	}
+
+	return x.cause.Error()
 }
 
 // StackLocation - A helper struct function which represents one step in the execution stack
@@ -230,5 +235,35 @@ func getStack(skip int) []StackLocation {
 		stack = append(stack, newStackLocation)
 
 		i++
+	}
+}
+
+// Wrap returns an error annotated with a stack trace, and is prefixed with
+// the given message.
+// If err is nil, Wrap will return nil.
+func Wrap(err error, message string) error {
+	if err == nil {
+		return nil
+	}
+
+	return &xerr{
+		stack: getStack(stackFunctionOffset),
+		cause: err,
+		msg:   message,
+	}
+}
+
+// Wrapf returns an error annotated with a stack trace, and the given,
+// formatted message.
+// If err is nil, Wrapf will return nil.
+func Wrapf(err error, format string, args ...interface{}) error {
+	if err == nil {
+		return nil
+	}
+
+	return &xerr{
+		stack: getStack(stackFunctionOffset),
+		cause: err,
+		msg:   fmt.Sprintf(format, args...),
 	}
 }
