@@ -20,6 +20,8 @@ These are the extra extended features which could be useful for debugging a big 
    return back to the client. Calling Error() will always return Mask if set.
 3. **Stack** - a detailed snapshot of the execution stack at error-time. Helpful for debugging.
 4. **Data** - a map which could be used to store custom data associated with an error.
+5. **Wrap** and **Wrapf** can be used to create an annotated error chain, but
+   take a lower precedence than **Mask**.
 
 ## Quick Usage
 
