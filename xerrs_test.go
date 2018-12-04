@@ -326,104 +326,100 @@ func TestExtend(t *testing.T) {
 	})
 }
 
-// TestStack -
-func TestStack(t *testing.T) {
-	Convey("testing stack of nil error", t, func() {
-		So(Stack(nil), ShouldEqual, nil)
+// TestMask -
+func TestMask(t *testing.T) {
+	Convey("nil error", t, func() {
+		err := Mask(nil, errors.New("ABC"))
+		So(err, ShouldEqual, nil)
 	})
 
-	Convey("testing stack of basic error", t, func() {
-		So(Stack(errors.New("ABC")), ShouldEqual, nil)
+	Convey("basic error with nil mask", t, func() {
+		err := Mask(errors.New("ABC"), nil)
+		_, ok := err.(*xerr)
+		So(err.Error(), ShouldEqual, "ABC")
+		So(ok, ShouldEqual, true)
 	})
 
-	Convey("testing stack of xerr", t, func() {
-		err := New("ABC")
-		stack := Stack(err)
+	Convey("basic error with not nil mask", t, func() {
+		err := Mask(errors.New("ABC"), errors.New("XYZ"))
+		_, ok := err.(*xerr)
+		So(err.Error(), ShouldEqual, "XYZ")
+		So(ok, ShouldEqual, true)
+	})
 
-		stack = transformStack(stack)
+	Convey("xerr without a mask", t, func() {
+		intial := Extend(errors.New("ABC"))
+		err := Mask(intial, errors.New("XYZ"))
+		_, ok := err.(*xerr)
+		So(err.Error(), ShouldEqual, "XYZ")
+		So(ok, ShouldEqual, true)
+	})
 
-		So(stack, ShouldResemble, []StackLocation{
-			StackLocation{
-				Function: "xerrs.TestStack.func3",
-				File:     "xerrs_test.go",
-				Line:     340,
-			},
-			StackLocation{
-				Function: "convey.parseAction.func1",
-				File:     "discovery.go",
-				Line:     80,
-			},
-			StackLocation{
-				Function: "convey.(*context).conveyInner",
-				File:     "context.go",
-				Line:     261,
-			},
-			StackLocation{
-				Function: "convey.rootConvey.func1",
-				File:     "context.go",
-				Line:     110,
-			},
-			StackLocation{
-				Function: "gls.(*ContextManager).SetValues.func1",
-				File:     "context.go",
-				Line:     97,
-			},
-			StackLocation{
-				Function: "gls.EnsureGoroutineId.func1",
-				File:     "gid.go",
-				Line:     24,
-			},
-			StackLocation{
-				Function: "gls._m",
-				File:     "stack_tags.go",
-				Line:     74,
-			},
-			StackLocation{
-				Function: "gls.github_com_jtolds_gls_markS",
-				File:     "stack_tags.go",
-				Line:     54,
-			},
-			StackLocation{
-				Function: "gls.addStackTag",
-				File:     "stack_tags.go",
-				Line:     49,
-			},
-			StackLocation{
-				Function: "gls.EnsureGoroutineId",
-				File:     "gid.go",
-				Line:     24,
-			},
-			StackLocation{
-				Function: "gls.(*ContextManager).SetValues",
-				File:     "context.go",
-				Line:     63,
-			},
-			StackLocation{
-				Function: "convey.rootConvey",
-				File:     "context.go",
-				Line:     105,
-			},
-			StackLocation{
-				Function: "convey.Convey",
-				File:     "doc.go",
-				Line:     75,
-			},
-			StackLocation{
-				Function: "xerrs.TestStack",
-				File:     "xerrs_test.go",
-				Line:     339,
-			},
-			StackLocation{
-				Function: "testing.tRunner",
-				File:     "testing.go",
-				Line:     827,
-			},
-			StackLocation{
-				Function: "runtime.goexit",
-				File:     "asm_amd64.s",
-				Line:     1333,
-			},
-		})
+	Convey("xerr with a mask", t, func() {
+		intial := Mask(errors.New("ABC"), errors.New("001"))
+		err := Mask(intial, errors.New("XYZ"))
+		_, ok := err.(*xerr)
+		So(err.Error(), ShouldEqual, "XYZ")
+		So(ok, ShouldEqual, true)
+	})
+
+	Convey("xerr setting nil mask", t, func() {
+		intial := Mask(errors.New("ABC"), errors.New("001"))
+		err := Mask(intial, nil)
+		_, ok := err.(*xerr)
+		So(err.Error(), ShouldEqual, "ABC")
+		So(ok, ShouldEqual, true)
+	})
+}
+
+func TestData(t *testing.T) {
+	t.Run("SetGet", func(t *testing.T) {
+		err := New("test")
+		SetData(err, "SOME_DATA", "test")
+
+		v, ok := GetData(err, "SOME_DATA")
+		if !ok {
+			t.Error("expected data")
+		}
+
+		if _, ok := v.(string); !ok {
+			t.Errorf("expected string, got %T", v)
+		}
+	})
+
+	t.Run("nil error nil data", func(t *testing.T) {
+		_, ok := GetData(nil, "test")
+		if ok {
+			t.Error("expected false")
+		}
+	})
+
+	t.Run("nil data", func(t *testing.T) {
+		err := New("test")
+		if _, ok := GetData(err, "test"); ok {
+			t.Error("expected false")
+		}
+	})
+
+	t.Run("nested error data", func(t *testing.T) {
+		a := New("a")
+		SetData(a, "foo", "bar")
+
+		b := Wrap(a, "b")
+
+		foo, ok := GetData(b, "foo")
+		if !ok {
+			t.Error("failed to get data for \"foo\"")
+		}
+
+		msg, ok := foo.(string)
+		if !ok {
+			t.Error("data for \"foo\" should be a string")
+		}
+
+		if msg != "bar" {
+			t.Errorf("wanted foo=%q, got foo=%q", "bar", msg)
+		}
 	})
 }
 
@@ -637,80 +633,6 @@ func TestIsEqual(t *testing.T) {
 			So(IsEqual(testCase.InputErr1, testCase.InputErr2), ShouldEqual, testCase.Output)
 		})
 	}
-}
-
-// TestMask -
-func TestMask(t *testing.T) {
-	Convey("nil error", t, func() {
-		err := Mask(nil, errors.New("ABC"))
-		So(err, ShouldEqual, nil)
-	})
-
-	Convey("basic error with nil mask", t, func() {
-		err := Mask(errors.New("ABC"), nil)
-		_, ok := err.(*xerr)
-		So(err.Error(), ShouldEqual, "ABC")
-		So(ok, ShouldEqual, true)
-	})
-
-	Convey("basic error with not nil mask", t, func() {
-		err := Mask(errors.New("ABC"), errors.New("XYZ"))
-		_, ok := err.(*xerr)
-		So(err.Error(), ShouldEqual, "XYZ")
-		So(ok, ShouldEqual, true)
-	})
-
-	Convey("xerr without a mask", t, func() {
-		intial := Extend(errors.New("ABC"))
-		err := Mask(intial, errors.New("XYZ"))
-		_, ok := err.(*xerr)
-		So(err.Error(), ShouldEqual, "XYZ")
-		So(ok, ShouldEqual, true)
-	})
-
-	Convey("xerr with a mask", t, func() {
-		intial := Mask(errors.New("ABC"), errors.New("001"))
-		err := Mask(intial, errors.New("XYZ"))
-		_, ok := err.(*xerr)
-		So(err.Error(), ShouldEqual, "XYZ")
-		So(ok, ShouldEqual, true)
-	})
-
-	Convey("xerr setting nil mask", t, func() {
-		intial := Mask(errors.New("ABC"), errors.New("001"))
-		err := Mask(intial, nil)
-		_, ok := err.(*xerr)
-		So(err.Error(), ShouldEqual, "ABC")
-		So(ok, ShouldEqual, true)
-	})
-}
-
-// TestGetDataAndSetData -
-func TestGetDataAndSetData(t *testing.T) {
-	Convey("GetData() and SetData()", t, func() {
-		var val interface{}
-		var ok bool
-
-		val, ok = GetData(nil, "SOME_DATA")
-		So(val, ShouldEqual, nil)
-		So(ok, ShouldEqual, false)
-
-		val, ok = GetData(errors.New("ABC"), "SOME_DATA")
-		So(val, ShouldEqual, nil)
-		So(ok, ShouldEqual, false)
-
-		xerr := New("ERROR")
-
-		val, ok = GetData(xerr, "SOME_DATA")
-		So(val, ShouldEqual, nil)
-		So(ok, ShouldEqual, false)
-
-		SetData(xerr, "SOME_DATA", 100)
-
-		val, ok = GetData(xerr, "SOME_DATA")
-		So(val, ShouldEqual, 100)
-		So(ok, ShouldEqual, true)
-	})
 }
 
 func TestWrap(t *testing.T) {

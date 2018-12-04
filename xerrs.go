@@ -131,25 +131,30 @@ func Cause(err error) error {
 	return err
 }
 
-// GetData - returns custom data stored in xerr
-// If err is not xerr then (nil, false) is returned
+// GetData returns custom data value, stored at name.
+// If err is not an *xerr then (nil, false) is returned.
+// If err is an *xerr, but its data map is empty, or does not contain the key
+// name, GetData will attempt to recurse through the error's causes, but will
+// stop at the first non-*xerr error.
 func GetData(err error, name string) (value interface{}, ok bool) {
-	var x *xerr
-
-	x, ok = err.(*xerr)
-
+	x, ok := err.(*xerr)
 	if !ok {
-		return
+		return nil, false
 	}
 
-	if x.data == nil {
-		ok = false
-		return
+	if x.data == nil && x.cause != nil {
+		// Check to see if x.cause is an *xerr as well, and see if it
+		// has the data at key name.
+		if cause, ok := x.cause.(*xerr); ok {
+			return GetData(cause, name)
+		}
+		return nil, false
+	} else if x.data == nil && x.cause == nil {
+		return nil, false
 	}
 
-	value, ok = x.data[name]
-
-	return
+	v, ok := x.data[name]
+	return v, ok
 }
 
 // SetData - sets custom data stored in xerr
