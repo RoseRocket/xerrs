@@ -705,3 +705,98 @@ func TestWrapf(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkWrap(b *testing.B) {
+	b.Run("chain", func(b *testing.B) {
+		err := New("test")
+		for i := 0; i < b.N; i++ {
+			wrapped := &xerr{
+				stack: getStack(stackFunctionOffset),
+				cause: err,
+				msg:   "prepend",
+			}
+
+			// inlined (*xerr).Error
+			if wrapped.mask != nil {
+				_ = wrapped.mask.Error()
+				continue
+			}
+
+			if wrapped.msg != "" {
+				_ = wrapped.msg + ": " + wrapped.cause.Error()
+				continue
+			}
+
+			_ = wrapped.cause.Error()
+		}
+	})
+
+	b.Run("prepend", func(b *testing.B) {
+		err := New("test")
+		for i := 0; i < b.N; i++ {
+			wrapped := &xerr{
+				stack: getStack(stackFunctionOffset),
+				cause: err,
+				msg:   "prepend" + ": " + err.Error(),
+			}
+
+			// inlined (*xerr).Error
+			if wrapped.mask != nil {
+				_ = wrapped.mask.Error()
+				continue
+			}
+
+			if wrapped.msg != "" {
+				_ = wrapped.msg + ": " + wrapped.cause.Error()
+				continue
+			}
+
+			_ = wrapped.cause.Error()
+		}
+	})
+
+	b.Run("prepend with typecheck", func(b *testing.B) {
+		for name, err := range map[string]error{
+			"error": errors.New("test"),
+			"xerr":  New("test"),
+		} {
+			b.Run(name, func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					if xe, ok := err.(*xerr); ok {
+						xe.msg = "prepend" + ": " + xe.msg
+
+						// modified (*xerr).Error
+						if xe.mask != nil {
+							xe.mask.Error()
+							continue
+						}
+
+						if xe.msg != "" {
+							continue
+						}
+
+						_ = xe.cause.Error()
+					} else {
+						wrapped := &xerr{
+							stack: getStack(stackFunctionOffset),
+							cause: err,
+							msg:   "prepend" + ": " + err.Error(),
+						}
+
+						// modified (*xerr).Error
+						if wrapped.mask != nil {
+							_ = wrapped.mask.Error()
+							continue
+						}
+
+						if wrapped.msg != "" {
+							continue
+						}
+
+						_ = wrapped.cause.Error()
+					}
+				}
+			})
+		}
+	})
+}
