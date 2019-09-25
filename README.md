@@ -20,6 +20,8 @@ These are the extra extended features which could be useful for debugging a big 
    return back to the client. Calling Error() will always return Mask if set.
 3. **Stack** - a detailed snapshot of the execution stack at error-time. Helpful for debugging.
 4. **Data** - a map which could be used to store custom data associated with an error.
+5. **Wrap** and **Wrapf** can be used to create an annotated error chain, but
+   take a lower precedence than **Mask**.
 
 ## Quick Usage
 
@@ -118,6 +120,55 @@ func VeryComplexLongFunction(arg1, arg2) error {
     //......
 }
 ```
+
+### Wrapped errors
+
+#### Basic wrapping
+
+```go
+func main() {
+	if err := a(); err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func a() error {
+	return xerrs.Wrap(b(), "called b")
+}
+
+func b() error {
+	return xerrs.New("uh oh, something bad happened")
+}
+```
+
+#### Formatted wrapping
+
+```go
+func main() {
+	numbers := []int{1, 2, 3}
+	if err := a(numbers...); err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func a(n ...int) error {
+	for i, v := range n {
+		if err := b(v); err != nil {
+			return xerrs.Wrapf(err, "called b(%d)", v)
+		}
+	}
+
+	return nil
+}
+
+func b(n int) error {
+	if n % 2 != 0 {
+		return xerrs.New("number is odd")
+	}
+	return nil
+}
+```
+
 
 ## Docs
 

@@ -16,14 +16,19 @@ type xerr struct {
 	cause error
 	mask  error
 	stack []StackLocation
+	msg   string
 }
 
 func (x *xerr) Error() string {
-	if x.mask == nil {
-		return x.cause.Error()
+	if x.mask != nil {
+		return x.mask.Error()
 	}
 
-	return x.mask.Error()
+	if x.msg != "" {
+		return x.msg + ": " + x.cause.Error()
+	}
+
+	return x.cause.Error()
 }
 
 // StackLocation - A helper struct function which represents one step in the execution stack
@@ -126,25 +131,30 @@ func Cause(err error) error {
 	return err
 }
 
-// GetData - returns custom data stored in xerr
-// If err is not xerr then (nil, false) is returned
+// GetData returns custom data value, stored at name.
+// If err is not an *xerr then (nil, false) is returned.
+// If err is an *xerr, but its data map is empty, or does not contain the key
+// name, GetData will attempt to recurse through the error's causes, but will
+// stop at the first non-*xerr error.
 func GetData(err error, name string) (value interface{}, ok bool) {
-	var x *xerr
-
-	x, ok = err.(*xerr)
-
+	x, ok := err.(*xerr)
 	if !ok {
-		return
+		return nil, false
 	}
 
-	if x.data == nil {
-		ok = false
-		return
+	if x.data == nil && x.cause != nil {
+		// Check to see if x.cause is an *xerr as well, and see if it
+		// has the data at key name.
+		if cause, ok := x.cause.(*xerr); ok {
+			return GetData(cause, name)
+		}
+		return nil, false
+	} else if x.data == nil && x.cause == nil {
+		return nil, false
 	}
 
-	value, ok = x.data[name]
-
-	return
+	v, ok := x.data[name]
+	return v, ok
 }
 
 // SetData - sets custom data stored in xerr
@@ -230,5 +240,35 @@ func getStack(skip int) []StackLocation {
 		stack = append(stack, newStackLocation)
 
 		i++
+	}
+}
+
+// Wrap returns an error annotated with a stack trace, and is prefixed with
+// the given message.
+// If err is nil, Wrap will return nil.
+func Wrap(err error, message string) error {
+	if err == nil {
+		return nil
+	}
+
+	return &xerr{
+		stack: getStack(stackFunctionOffset),
+		cause: err,
+		msg:   message,
+	}
+}
+
+// Wrapf returns an error annotated with a stack trace, and the given,
+// formatted message.
+// If err is nil, Wrapf will return nil.
+func Wrapf(err error, format string, args ...interface{}) error {
+	if err == nil {
+		return nil
+	}
+
+	return &xerr{
+		stack: getStack(stackFunctionOffset),
+		cause: err,
+		msg:   fmt.Sprintf(format, args...),
 	}
 }
