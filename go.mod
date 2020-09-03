@@ -1,1 +1,1 @@
-module github.com/roserocket/xerrs
+module github.com/RoseRocket/xerrs
